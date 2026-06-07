@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JESUS REINA Notes v2026 - Cyberpunk Edition</title>
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Share+Tech+Mono&display=swap');
+        :root {
+            --neon-purple: #a78bfa; /* purple-400 */
+            --neon-pink: #f472b6; /* pink-400 */
+            --neon-green: #34d399; /* green-400 */
+            --neon-blue: #60a5fa; /* blue-400 */
+            --bg-dark: #0a0a0a; /* neutral-950 */
+            --glass-bg: rgba(28, 28, 36, 0.3); /* dark transparent */
+            --glass-border: rgba(94, 94, 102, 0.3); /* lighter transparent */
+        }
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background-color: var(--bg-dark);
+            color: #e2e8f0; /* slate-200 */
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        h1, h2, h3, .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+        .neon-text-gradient-purple {
+            background-image: linear-gradient(to right, var(--neon-purple), var(--neon-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .neon-text-gradient-blue {
+            background-image: linear-gradient(to right, var(--neon-blue), var(--neon-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .glassmorphism {
+            background-color: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 4px 60px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .glassmorphism-input {
+            background-color: rgba(15, 23, 42, 0.5); /* slate-900 with transparency */
+            border: 1px solid rgba(139, 92, 246, 0.4); /* violet-500 with transparency */
+            color: #e2e8f0;
+        }
+        .glassmorphism-input:focus {
+            outline: none;
+            border-color: var(--neon-purple);
+            box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.5);
+        }
+        .neon-button {
+            background: linear-gradient(to right, #8B5CF6, #EC4899); /* violet-500 to pink-500 */
+            transition: all 0.3s ease;
+            box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+        }
+        .neon-button:hover {
+            background: linear-gradient(to right, #7C3AED, #DB2777); /* violet-600 to pink-600 */
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.8), 0 0 25px rgba(236, 72, 153, 0.5);
+        }
+        .skeleton {
+            animation: pulse 1.5s infinite;
+            background-color: #334155; /* slate-700 */
+            border-radius: 0.375rem; /* rounded-md */
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .scroll-glow::-webkit-scrollbar {
+            width: 8px;
+        }
+        .scroll-glow::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+        .scroll-glow::-webkit-scrollbar-thumb {
+            background-color: rgba(167, 139, 250, 0.7); /* neon-purple with transparency */
+            border-radius: 4px;
+            border: 2px solid var(--bg-dark);
+        }
+        .scroll-glow::-webkit-scrollbar-thumb:hover {
+            background-color: var(--neon-purple);
+        }
+
+        /* PLANNING (Chain of Thought):
+        - **Tipo:** APP (Aplicação Web de Anotações)
+        - **Estrutura:**
+            - `body`: Fundo dinâmico (Unsplash) com overlay para tema Cyberpunk Neon/Glassmorphism.
+            - `main container`: Layout responsivo com conteúdo principal (Notas) e sidebar (Widgets API).
+            - `Header`: Título principal da aplicação.
+            - `Formulário de Anotação`: Campos para título e conteúdo, botões para adicionar/atualizar.
+            - `Lista de Anotações`: Exibição de anotações individuais com opções de editar/excluir.
+            - `Sidebar/Widgets`: Área dedicada para integrar APIs externas como OpenWeather, NewsAPI, TMDB.
+            - `Footer`: Informações de copyright.
+        - **Componentes:**
+            - `NoteCard`: Componente para cada anotação.
+            - `WidgetCard`: Componente genérico para cada widget de API.
+            - `SkeletonLoaders`: Para estados de carregamento.
+        - **Estados e Mecânicas:**
+            - `loading`: Exibe esqueletos enquanto dados são buscados.
+            - `notes-loaded`: Exibe anotações, permite CRUD.
+            - `editing-note`: Formulário preenchido para edição.
+            - `no-notes`: Mensagem quando não há anotações.
+            - **Mecânicas:**
+                - Adicionar nova anotação.
+                - Visualizar anotações (persistência via `localStorage` para esta demo, mas planejado para Supabase).
+                - Editar anotação existente.
+                - Excluir anotação.
+                - Carregar dados de widgets via APIs.
+        - **CMS/Backend:**
+            - **Planejado para Supabase:** Para persistência real de dados (banco de dados, autenticação). No código gerado, usaremos `localStorage` para a demonstração funcional cliente-side, com placeholders para a integração Supabase.
+        - **APIs Utilizadas (e como se encaixam):**
+            - **Unsplash:** Imagem de fundo dinâmica e inspiradora para o tema.
+            - **OpenWeatherMap:** Widget de clima atual na sidebar.
+            - **NewsAPI:** Widget de notícias principais na sidebar.
+            - **TMDB:** Widget de sugestão de filme na sidebar (trending movie).
+            - **Deezer:** (Decisão: Integração direta client-side para reprodução ou dados de usuário complexa. Será omitida para manter o foco nas outras APIs de dados e evitar complexidade de OAuth sem backend).
+        - **Design:** Cyberpunk Neon/Glassmorphism com TailwindCSS e Lucide Icons.
+        - **Responsividade:** Mobile-first com media queries do Tailwind.
+        - **Transições:** Suaves para interações e carregamento.
+        - **Loading States:** Skeletons para todas as seções dinâmicas.
+        */
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-950 to-black text-gray-100 min-h-screen relative overflow-hidden">
+    <!-- Unsplash Background Layer -->
+    <div id="unsplash-bg" class="absolute inset-0 bg-cover bg-center opacity-20 transition-opacity duration-1000 ease-in-out z-0" style="background-image: url('https://images.unsplash.com/photo-1558507204-747f52554746?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w1ODU1MzJ8MHwxfHNlYXJjaHw0fHxjeWJlcnB1bmslMjBjaXR5fGVufDB8fHx8MTcwMTkxNjAwMHww&ixlib=rb-4.0.3&q=80&w=1920');"></div>
+
+    <div class="container mx-auto p-4 md:p-8 relative z-10 flex flex-col lg:flex-row gap-8">
+        <!-- Main Content - Notes Application -->
+        <main class="flex-1 glassmorphism rounded-xl p-6 md:p-8 shadow-2xl relative flex flex-col min-h-[70vh]">
+            <header class="mb-8">
+                <h1 class="text-4xl md:text-5xl font-orbitron font-bold neon-text-gradient-purple tracking-wider leading-tight">JESUS REINA Notes <span class="text-xl md:text-2xl opacity-70 font-mono">v2026</span></h1>
+                <p class="text-sm text-gray-400 mt-2">Your digital thoughts in a cyberpunk future.</p>
+            </header>
+
+            <!-- Add/Edit Note Form -->
+            <section class="mb-8 p-6 glassmorphism rounded-lg shadow-xl border-purple-500/30">
+                <h2 class="text-2xl font-orbitron font-semibold mb-4 text-purple-400 flex items-center"><i data-lucide="notebook-pen" class="mr-2 w-6 h-6"></i> New / Edit Note</h2>
+                <div class="space-y-4">
+                    <input type="text" id="note-title" placeholder="Note Title" class="w-full p-3 rounded-md glassmorphism-input focus:ring-purple-500 transition-all duration-300 placeholder-purple-300/60">
+                    <textarea id="note-content" placeholder="Note Content" rows="6" class="w-full p-3 rounded-md glassmorphism-input focus:ring-purple-500 transition-all duration-300 placeholder-purple-300/60 resize-y"></textarea>
+                    <div class="flex gap-4">
+                        <button id="add-note-btn" class="flex-1 py-3 neon-button text-white font-bold rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all duration-300 shadow-lg">
+                            <i data-lucide="plus" class="inline-block mr-2 w-5 h-5"></i> Add Note
+                        </button>
+                        <button id="update-note-btn" class="flex-1 py-3 neon-button bg-gradient-to-r from-green-600 to-blue-500 hover:from-green-700 hover:to-blue-600 focus:ring-green-500 hidden" style="box-shadow: 0 0 10px rgba(52, 211, 153, 0.5);">
+                            <i data-lucide="save" class="inline-block mr-2 w-5 h-5"></i> Update Note
+                        </button>
+                        <button id="cancel-edit-btn" class="flex-1 py-3 neon-button bg-gradient-to-r from-gray-600 to-gray-400 hover:from-gray-700 hover:to-gray-500 focus:ring-gray-500 hidden" style="box-shadow: 0 0 10px rgba(100, 116, 139, 0.5);">
+                            <i data-lucide="x" class="inline-block mr-2 w-5 h-5"></i> Cancel
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Notes List -->
+            <section class="flex-1 flex flex-col">
+                <h2 class="text-2xl font-orbitron font-semibold mb-4 text-pink-400 flex items-center"><i data-lucide="scroll-text" class="mr-2 w-6 h-6"></i> Your Encrypted Thoughts</h2>
+                <div id="notes-list" class="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-4 scroll-glow overflow-y-auto">
+                    <!-- Skeleton Loaders for Notes -->
+                    <div class="glassmorphism rounded-lg p-5 shadow-xl border-blue-500/30 skeleton h-40"></div>
+                    <div class="glassmorphism rounded-lg p-5 shadow-xl border-green-500/30 skeleton h-40"></div>
+                    <div class="glassmorphism rounded-lg p-5 shadow-xl border-red-500/30 skeleton h-40 hidden md:block"></div>
+                </div>
+                <p id="no-notes-message" class="text-center text-gray-500 mt-8 hidden">No thoughts recorded yet. Start by adding one!</p>
+            </section>
+        </main>
+
+        <!-- Sidebar - API Widgets -->
+        <aside class="w-full lg:w-96 glassmorphism rounded-xl p-6 md:p-8 shadow-2xl space-y-8 h-fit lg:max-h-[calc(100vh-6rem)] overflow-y-auto scroll-glow">
+            <h2 class="text-3xl font-orbitron font-bold neon-text-gradient-blue mb-6 leading-tight">Cyber-Widgets</h2>
+
+            <!-- Weather Widget -->
+            <div class="p-4 glassmorphism rounded-lg shadow-xl border-blue-500/30">
+                <h3 class="text-xl font-orbitron font-semibold mb-3 text-blue-400 flex items-center"><i data-lucide="cloud" class="mr-2 w-5 h-5"></i> Current Weather</h3>
+                <div id="weather-widget">
+                    <!-- Weather Skeleton -->
+                    <div class="animate-pulse space-y-2">
+                        <div class="h-4 bg-gray-700 rounded w-3/4"></div>
+                        <div class="h-4 bg-gray-700 rounded w-1/2"></div>
+                        <div class="h-4 bg-gray-700 rounded w-full"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- News Widget -->
+            <div class="p-4 glassmorphism rounded-lg shadow-xl border-green-500/30">
+                <h3 class="text-xl font-orbitron font-semibold mb-3 text-green-400 flex items-center"><i data-lucide="newspaper" class="mr-2 w-5 h-5"></i> Top Cyber-News</h3>
+                <div id="news-widget">
+                    <!-- News Skeleton -->
+                    <div class="animate-pulse space-y-2">
+                        <div class="h-4 bg-gray-700 rounded w-full"></div>
+                        <div class="h-4 bg-gray-700 rounded w-5/6"></div>
+                        <div class="h-4 bg-gray-700 rounded w-full"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Movie Widget -->
+            <div class="p-4 glassmorphism rounded-lg shadow-xl border-red-500/30">
+                <h3 class="text-xl font-orbitron font-semibold mb-3 text-red-400 flex items-center"><i data-lucide="film" class="mr-2 w-5 h-5"></i> Movie Suggestion</h3>
+                <div id="movie-widget">
+                    <!-- Movie Skeleton -->
+                    <div class="animate-pulse space-y-2">
+                        <div class="h-4 bg-gray-700 rounded w-full"></div>
+                        <div class="h-4 bg-gray-700 rounded w-3/5"></div>
+                        <div class="h-20 bg-gray-700 rounded w-full"></div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center py-6 text-gray-500 text-sm relative z-10 mt-auto">
+        <p>&copy; 2026 JESUS REINA AI ENGINE. All rights reserved. Code optimized for a new reality.</p>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // --- API Keys (PLACEHOLDERS - REPLACE WITH YOUR ACTUAL KEYS) ---
+        // For security, never expose production API keys directly in client-side code.
+        // Use a backend proxy for production environments.
+        const UNSPLASH_ACCESS_KEY = 'YOUR_UNSPLASH_ACCESS_KEY'; // Required for Unsplash
+        const OPENWEATHER_API_KEY = 'YOUR_OPENWEATHER_API_KEY'; // Required for OpenWeatherMap
+        const NEWSAPI_API_KEY = 'YOUR_NEWSAPI_API_KEY';         // Required for NewsAPI
+        const TMDB_API_KEY = 'YOUR_TMDB_API_KEY';               // Required for TMDB
+
+        // --- Supabase Planned Backend Integration (Placeholders) ---
+        // This section illustrates where Supabase would integrate.
+        // For this client-side demo, notes are stored in localStorage.
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+        // import { createClient } from '@supabase/supabase-js'
+        // const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+        // --- DOM Elements ---
+        const unsplashBg = document.getElementById('unsplash-bg');
+        const noteTitleInput = document.getElementById('note-title');
+        const noteContentInput = document.getElementById('note-content');
+        const addNoteBtn = document.getElementById('add-note-btn');
+        const updateNoteBtn = document.getElementById('update-note-btn');
+        const cancelEditBtn = document.getElementById('cancel-edit-btn');
+        const notesList = document.getElementById('notes-list');
+        const noNotesMessage = document.getElementById('no-notes-message');
+        const weatherWidget = document.getElementById('weather-widget');
+        const newsWidget = document.getElementById('news-widget');
+        const movieWidget = document.getElementById('movie-widget');
+
+        let notes = [];
+        let editingNoteId = null;
+
+        // --- Utility Functions ---
+        function generateUniqueId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+        }
+
+        function saveNotesToLocalStorage() {
+            localStorage.setItem('jesusReinaNotes', JSON.stringify(notes));
+        }
+
+        function loadNotesFromLocalStorage() {
+            const storedNotes = localStorage.getItem('jesusReinaNotes');
+            notes = storedNotes ? JSON.parse(storedNotes) : [];
+            displayNotes();
+        }
+
+        // --- Note Management Functions ---
+        function displayNotes() {
+            notesList.innerHTML = ''; // Clear current notes
+            if (notes.length === 0) {
+                notesList.innerHTML = ''; // Ensure skeletons are cleared if no notes
+                noNotesMessage.classList.remove('hidden');
+                return;
+            }
+            noNotesMessage.classList.add('hidden');
+
+            notes.forEach(note => {
+                const noteCard = document.createElement('div');
+                noteCard.className = 'note-card glassmorphism rounded-lg p-5 shadow-xl relative transition-all duration-300 ease-in-out hover:shadow-purple-500/30';
+                noteCard.innerHTML = `
+                    <h3 class="text-xl font-orbitron font-semibold text-purple-300 mb-2">${note.title}</h3>
+                    <p class="text-gray-300 text-sm mb-4 line-clamp-4">${note.content}</p>
+                    <div class="flex space-x-3 mt-4">
+                        <button class="text-blue-400 hover:text-blue-300 transition-colors duration-200" onclick="editNote('${note.id}')">
+                            <i data-lucide="pencil" class="w-5 h-5"></i>
+                        </button>
+                        <button class="text-red-400 hover:text-red-300 transition-colors duration-200" onclick="deleteNote('${note.id}')">
+                            <i data-lucide="trash-2" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                `;
+                notesList.appendChild(noteCard);
+            });
+            lucide.createIcons(); // Re-render icons for new elements
+        }
+
+        function addNote() {
+            const title = noteTitleInput.value.trim();
+            const content = noteContentInput.value.trim();
+
+            if (!title || !content) {
+                alert('Please enter both title and content for the note.');
+                return;
+            }
+
+            const newNote = {
+                id: generateUniqueId(),
+                title: title,
+                content: content,
+                createdAt: new Date().toISOString()
+            };
+            notes.unshift(newNote); // Add to the beginning
+            saveNotesToLocalStorage();
+            displayNotes();
+            noteTitleInput.value = '';
+            noteContentInput.value = '';
+
+            // --- Supabase Placeholder ---
+            // const { data, error } = await supabase
+            //   .from('notes')
+            //   .insert([newNote])
+            // if (error) console.error('Error adding note to Supabase:', error);
+        }
+
+        function editNote(id) {
+            const noteToEdit = notes.find(note => note.id === id);
+            if (noteToEdit) {
+                noteTitleInput.value = noteToEdit.title;
+                noteContentInput.value = noteToEdit.content;
+                addNoteBtn.classList.add('hidden');
+                updateNoteBtn.classList.remove('hidden');
+                cancelEditBtn.classList.remove('hidden');
+                editingNoteId = id;
+            }
+        }
+
+        function updateNote() {
+            if (!editingNoteId) return;
+
+            const title = noteTitleInput.value.trim();
+            const content = noteContentInput.value.trim();
+
+            if (!title || !content) {
+                alert('Please enter both title and content for the note.');
+                return;
+            }
+
+            notes = notes.map(note =>
+                note.id === editingNoteId ? { ...note, title, content } : note
+            );
+            saveNotesToLocalStorage();
+            displayNotes();
+            resetNoteForm();
+
+            // --- Supabase Placeholder ---
+            // const { data, error } = await supabase
+            //   .from('notes')
+            //   .update({ title, content })
+            //   .eq('id', editingNoteId)
+            // if (error) console.error('Error updating note in Supabase:', error);
+        }
+
+        function deleteNote(id) {
+            if (!confirm('Are you sure you want to delete this note? This action cannot be undone.')) {
+                return;
+            }
+            notes = notes.filter(note => note.id !== id);
+            saveNotesToLocalStorage();
+            displayNotes();
+            resetNoteForm(); // In case we were editing the deleted note
+
+            // --- Supabase Placeholder ---
+            // const { error } = await supabase
+            //   .from('notes')
+            //   .delete()
+            //   .eq('id', id)
+            // if (error) console.error('Error deleting note from Supabase:', error);
+        }
+
+        function resetNoteForm() {
+            noteTitleInput.value = '';
+            noteContentInput.value = '';
+            addNoteBtn.classList.remove('hidden');
+            updateNoteBtn.classList.add('hidden');
+            cancelEditBtn.classList.add('hidden');
+            editingNoteId = null;
+        }
+
+        // --- Event Listeners ---
+        addNoteBtn.addEventListener('click', addNote);
+        updateNoteBtn.addEventListener('click', updateNote);
+        cancelEditBtn.addEventListener('click', resetNoteForm);
+
+        // --- API Widget Functions ---
+
+        async function fetchUnsplashBackground() {
+            if (UNSPLASH_ACCESS_KEY === 'YOUR_UNSPLASH_ACCESS_KEY') {
+                console.warn("Unsplash API key not set. Using default background image.");
+                return;
+            }
+            const query = 'cyberpunk city neon rain'; // More specific query for theme
+            const url = `https://api.unsplash.com/photos/random?query=${query}&orientation=landscape&client_id=${UNSPLASH_ACCESS_KEY}`;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                if (data.urls && data.urls.full) {
+                    unsplashBg.style.backgroundImage = `url('${data.urls.full}')`;
+                }
+            } catch (error) {
+                console.error('Error fetching Unsplash image:', error);
+            }
+        }
+
+        async function fetchWeather() {
+            if (OPENWEATHER_API_KEY === 'YOUR_OPENWEATHER_API_KEY') {
+                weatherWidget.innerHTML = `<p class="text-red-400">OpenWeather API key not set.</p>`;
+                return;
+            }
+            // Default to a common city for demonstration if geolocation fails or is denied
+            const defaultLat = 34.0522; // Los Angeles
+            const defaultLon = -118.2437;
+            
+            weatherWidget.innerHTML = `
+                <div class="animate-pulse space-y-2">
+                    <div class="h-4 bg-gray-700 rounded w-3/4"></div>
+                    <div class="h-4 bg-gray-700 rounded w-1/2"></div>
+                    <div class="h-4 bg-gray-700 rounded w-full"></div>
+                </div>`;
+
+            try {
+                // Try to get user's current location
+                const getLocation = () => new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+                });
+
+                let lat, lon;
+                try {
+                    const pos = await getLocation();
+                    lat = pos.coords.latitude;
+                    lon = pos.coords.longitude;
+                } catch (geoError) {
+                    console.warn("Geolocation denied or failed, using default location (Los Angeles).", geoError);
+                    lat = defaultLat;
+                    lon = defaultLon;
+                }
+
+                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${OPENWEATHER_API_KEY}&units=metric`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+
+                const weatherIconUrl = `https://openweathermap.org/img/wn/${data.weather[0].icon}.png`;
+
+                weatherWidget.innerHTML = `
+                    <div class="flex items-center space-x-3 mb-2">
+                        <img src="${weatherIconUrl}" alt="${data.weather[0].description}" class="w-10 h-10">
+                        <span class="text-3xl font-bold text-blue-300">${Math.round(data.main.temp)}°C</span>
+                    </div>
+                    <p class="text-lg text-gray-200 capitalize">${data.weather[0].description}</p>
+                    <p class="text-gray-400">Feels like: ${Math.round(data.main.feels_like)}°C</p>
+                    <p class="text-gray-400">Location: ${data.name}, ${data.sys.country}</p>
+                `;
+                lucide.createIcons();
+            } catch (error) {
+                console.error('Error fetching weather:', error);
+                weatherWidget.innerHTML = `<p class="text-red-400">Failed to load weather data.</p>`;
+            }
+        }
+
+        async function fetchNews() {
+            if (NEWSAPI_API_KEY === 'YOUR_NEWSAPI_API_KEY') {
+                newsWidget.innerHTML = `<p class="text-red-400">NewsAPI key not set.</p>`;
+                return;
+            }
+            newsWidget.innerHTML = `
+                <div class="animate-pulse space-y-2">
+                    <div class="h-4 bg-gray-700 rounded w-full"></div>
+                    <div class="h-4 bg-gray-700 rounded w-5/6"></div>
+                    <div class="h-4 bg-gray-700 rounded w-full"></div>
+                </div>`;
+
+            const url = `https://newsapi.org/v2/top-headlines?country=us&apiKey=${NEWSAPI_API_KEY}`;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+
+                if (data.articles && data.articles.length > 0) {
+                    newsWidget.innerHTML = `<ul class="space-y-3"></ul>`;
+                    const newsList = newsWidget.querySelector('ul');
+                    data.articles.slice(0, 5).forEach(article => {
+                        const listItem = document.createElement('li');
+                        listItem.innerHTML = `
+                            <a href="${article.url}" target="_blank" rel="noopener noreferrer" class="block p-2 glassmorphism-input rounded-md hover:bg-gray-800 hover:border-green-400/50 transition-all duration-200">
+                                <p class="text-green-300 font-semibold mb-1">${article.title}</p>
+                                <p class="text-gray-400 text-sm line-clamp-2">${article.description || 'No description available.'}</p>
+                            </a>
+                        `;
+                        newsList.appendChild(listItem);
+                    });
+                } else {
+                    newsWidget.innerHTML = `<p class="text-gray-400">No news found.</p>`;
+                }
+            } catch (error) {
+                console.error('Error fetching news:', error);
+                newsWidget.innerHTML = `<p class="text-red-400">Failed to load news data.</p>`;
+            }
+        }
+
+        async function fetchMovieSuggestion() {
+            if (TMDB_API_KEY === 'YOUR_TMDB_API_KEY') {
+                movieWidget.innerHTML = `<p class="text-red-400">TMDB API key not set.</p>`;
+                return;
+            }
+            movieWidget.innerHTML = `
+                <div class="animate-pulse space-y-2">
+                    <div class="h-4 bg-gray-700 rounded w-full"></div>
+                    <div class="h-4 bg-gray-700 rounded w-3/5"></div>
+                    <div class="h-20 bg-gray-700 rounded w-full"></div>
+                </div>`;
+
+            const url = `https://api.themoviedb.org/3/trending/movie/week?api_key=${TMDB_API_KEY}`;
+            const imageUrlBase = 'https://image.tmdb.org/t/p/w500';
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+
+                if (data.results && data.results.length > 0) {
+                    const randomMovie = data.results[Math.floor(Math.random() * data.results.length)];
+                    const posterPath = randomMovie.poster_path ? `${imageUrlBase}${randomMovie.poster_path}` : 'https://via.placeholder.com/150x225?text=No+Poster';
+
+                    movieWidget.innerHTML = `
+                        <div class="flex flex-col md:flex-row gap-4">
+                            <img src="${posterPath}" alt="${randomMovie.title}" class="w-24 h-36 object-cover rounded-md flex-shrink-0 border border-red-500/30 shadow-md">
+                            <div>
+                                <h3 class="text-lg font-orbitron font-bold text-red-300 mb-1">${randomMovie.title}</h3>
+                                <p class="text-gray-400 text-sm mb-2">Rating: <span class="text-yellow-400">${randomMovie.vote_average.toFixed(1)}/10</span></p>
+                                <p class="text-gray-300 text-xs line-clamp-3">${randomMovie.overview}</p>
+                                <a href="https://www.themoviedb.org/movie/${randomMovie.id}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center text-red-500 hover:text-red-400 text-sm mt-2 transition-colors duration-200">
+                                    View Details <i data-lucide="external-link" class="ml-1 w-4 h-4"></i>
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                    lucide.createIcons();
+                } else {
+                    movieWidget.innerHTML = `<p class="text-gray-400">No movie suggestions found.</p>`;
+                }
+            } catch (error) {
+                console.error('Error fetching movie:', error);
+                movieWidget.innerHTML = `<p class="text-red-400">Failed to load movie data.</p>`;
+            }
+        }
+
+        // --- Initialize App ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadNotesFromLocalStorage();
+            fetchUnsplashBackground();
+            fetchWeather();
+            fetchNews();
+            fetchMovieSuggestion();
+        });
+    </script>
+</body>
+</html>
