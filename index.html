@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Omega Factory ⚡</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #0f0f18;
+    --card: #13131e;
+    --border: #1e1e2e;
+    --primary: #7c3aed;
+    --primary-hover: #6d28d9;
+    --primary-glow: rgba(124,58,237,0.15);
+    --text: #e2e2f0;
+    --muted: #6b6b8a;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --font: 'Segoe UI', system-ui, sans-serif;
+    --mono: 'Courier New', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: var(--primary-glow);
+    border: 1px solid var(--primary);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+
+  .logo-text h1 { font-size: 14px; font-weight: 700; }
+  .logo-text p { font-size: 10px; color: var(--muted); }
+
+  .status-dot {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10px; color: var(--muted); font-family: var(--mono);
+  }
+
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* LAYOUT */
+  .main {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 320px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    gap: 16px;
+    overflow-y: auto;
+  }
+
+  .section-label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); margin-bottom: 2px;
+  }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; }
+
+  select, input[type="password"], input[type="text"] {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 12px;
+    padding: 7px 10px;
+    outline: none;
+    font-family: var(--font);
+    transition: border-color 0.2s;
+  }
+
+  select:focus, input:focus { border-color: var(--primary); }
+
+  .api-key-wrap { position: relative; }
+  .api-key-wrap input { padding-right: 36px; }
+  .eye-btn {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 14px; padding: 2px;
+  }
+
+  .divider { height: 1px; background: var(--border); }
+
+  textarea {
+    width: 100%; min-height: 160px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 12px;
+    padding: 10px;
+    outline: none;
+    resize: vertical;
+    font-family: var(--font);
+    line-height: 1.5;
+    transition: border-color 0.2s;
+  }
+
+  textarea:focus { border-color: var(--primary); }
+  textarea::placeholder { color: var(--muted); }
+
+  .btn-row { display: flex; gap: 8px; }
+
+  .btn-generate {
+    flex: 1;
+    background: var(--primary);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: background 0.2s, opacity 0.2s;
+  }
+
+  .btn-generate:hover:not(:disabled) { background: var(--primary-hover); }
+  .btn-generate:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .btn-stop {
+    background: var(--danger);
+    border: none; border-radius: 8px;
+    color: #fff; font-size: 12px; font-weight: 600;
+    padding: 10px 14px; cursor: pointer;
+    display: flex; align-items: center; gap: 5px;
+    transition: opacity 0.2s;
+  }
+
+  .btn-stop:hover { opacity: 0.85; }
+  .btn-stop.hidden { display: none; }
+
+  .hint {
+    font-size: 10px; color: var(--muted);
+    text-align: center; margin-top: -8px;
+  }
+
+  /* PANEL */
+  .panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  /* TABS */
+  .tabs-bar {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+    padding: 0 16px;
+    flex-shrink: 0;
+  }
+
+  .tab-btn {
+    background: none; border: none;
+    color: var(--muted); font-size: 12px;
+    padding: 10px 14px; cursor: pointer;
+    display: flex; align-items: center; gap: 5px;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.2s;
+  }
+
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+  /* CONTENT */
+  .content { flex: 1; position: relative; min-height: 0; }
+
+  .tab-content { position: absolute; inset: 0; display: none; flex-direction: column; }
+  .tab-content.active { display: flex; }
+
+  /* PREVIEW */
+  .preview-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--card);
+    flex-shrink: 0;
+  }
+
+  .window-dots { display: flex; gap: 6px; }
+  .window-dots span {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+  .window-dots .r { background: #ff5f57; }
+  .window-dots .y { background: #ffbd2e; }
+  .window-dots .g { background: #28c840; }
+
+  .resp-btns { display: flex; gap: 2px; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 3px; }
+
+  .resp-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); padding: 5px 8px; border-radius: 6px;
+    font-size: 13px; transition: all 0.2s;
+  }
+
+  .resp-btn:hover { color: var(--text); }
+  .resp-btn.active { background: rgba(124,58,237,0.2); color: var(--primary); }
+
+  .preview-area {
+    flex: 1; overflow: auto;
+    background: #111118;
+    display: flex; justify-content: center;
+    padding: 16px;
+  }
+
+  .iframe-wrapper {
+    transition: width 0.3s;
+    height: 100%;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  .iframe-wrapper.view-desktop { width: 100%; }
+  .iframe-wrapper.view-tablet { width: 768px; max-width: 100%; }
+  .iframe-wrapper.view-mobile { width: 375px; max-width: 100%; }
+
+  #output-frame { width: 100%; height: 100%; border: none; }
+
+  .preview-empty {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    height: 100%; gap: 12px; color: var(--muted);
+  }
+
+  .preview-empty .icon { font-size: 48px; opacity: 0.2; }
+  .preview-empty p { font-size: 13px; }
+
+  /* CODE VIEW */
+  .code-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--card);
+    flex-shrink: 0;
+  }
+
+  .code-filename { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+  .code-actions { display: flex; gap: 4px; }
+
+  .icon-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); padding: 5px 8px; border-radius: 6px;
+    font-size: 12px; transition: all 0.2s;
+  }
+
+  .icon-btn:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+  .icon-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .code-area {
+    flex: 1; overflow: auto;
+    background: #07070f;
+    padding: 16px;
+  }
+
+  #code-output {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: #a0a0c0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.6;
+  }
+
+  .code-empty {
+    display: flex; align-items: center; justify-content: center;
+    height: 100%; color: var(--muted); font-size: 13px;
+  }
+
+  /* LOG */
+  .log-bar {
+    border-top: 1px solid var(--border);
+    background: var(--card);
+    flex-shrink: 0;
+  }
+
+  .log-header {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.07em;
+  }
+
+  #status-log {
+    padding: 6px 16px 8px;
+    max-height: 80px;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  #status-log p { padding: 1px 0; }
+  #status-log p::before { content: '› '; color: var(--primary); opacity: 0.5; }
+
+  /* SPINNER */
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 3px; }
+
+  /* RESPONSIVE */
+  @media (max-width: 700px) {
+    .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+    .main { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div class="logo-text">
+      <h1>Omega Factory</h1>
+      <p>Gerador de Software com IA</p>
+    </div>
+  </div>
+  <div class="status-dot">
+    <div class="dot"></div>
+    Online
+  </div>
+</header>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <div>
+      <div class="section-label">⚙ Configuração</div>
+      <div class="grid-2" style="margin-top:8px">
+        <div>
+          <label>Provedor</label>
+          <select id="api-provider">
+            <option value="gemini">Google Gemini</option>
+            <option value="groq">Groq</option>
+          </select>
+        </div>
+        <div>
+          <label>Modelo</label>
+          <select id="model-select"></select>
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <label>API Key</label>
+        <div class="api-key-wrap">
+          <input type="password" id="api-key" placeholder="Cole sua API Key aqui..." />
+          <button class="eye-btn" id="eye-btn" title="Mostrar/ocultar">👁</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;flex:1">
+      <div class="section-label">✏ Prompt</div>
+      <textarea id="prompt" placeholder="Descreva o que você quer criar...
+
+Ex: Crie um app de lista de tarefas com design moderno, dark mode, drag & drop e localStorage..."></textarea>
+
+      <div class="btn-row">
+        <button class="btn-generate" id="generate-btn">
+          <span>✨</span> Gerar Projeto
+        </button>
+        <button class="btn-stop hidden" id="stop-btn">
+          ⏹ Parar
+        </button>
+      </div>
+      <p class="hint">Ctrl+Enter para gerar</p>
+    </div>
+
+  </aside>
+
+  <!-- PANEL -->
+  <div class="panel">
+
+    <!-- TABS -->
+    <div class="tabs-bar">
+      <button class="tab-btn active" onclick="switchTab('preview', this)">👁 Prévia</button>
+      <button class="tab-btn" onclick="switchTab('code', this)">💻 Código</button>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content">
+
+      <!-- PREVIEW TAB -->
+      <div class="tab-content active" id="tab-preview">
+        <div class="preview-toolbar">
+          <div class="window-dots">
+            <span class="r"></span><span class="y"></span><span class="g"></span>
+          </div>
+          <div class="resp-btns">
+            <button class="resp-btn active" data-view="desktop" title="Desktop">🖥</button>
+            <button class="resp-btn" data-view="tablet" title="Tablet">📱</button>
+            <button class="resp-btn" data-view="mobile" title="Mobile">📲</button>
+          </div>
+          <span style="font-size:10px;color:var(--muted);font-family:var(--mono)" id="view-label">100%</span>
+        </div>
+        <div class="preview-area">
+          <div class="iframe-wrapper view-desktop" id="iframe-wrapper">
+            <div class="preview-empty" id="preview-empty">
+              <div class="icon">🖥</div>
+              <p>A prévia aparecerá aqui</p>
+            </div>
+            <iframe id="output-frame" style="display:none"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              title="Preview"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- CODE TAB -->
+      <div class="tab-content" id="tab-code">
+        <div class="code-toolbar">
+          <span class="code-filename">index.html</span>
+          <div class="code-actions">
+            <button class="icon-btn" id="copy-btn" onclick="copyCode()" disabled title="Copiar">📋 Copiar</button>
+            <button class="icon-btn" id="download-btn" onclick="downloadCode()" disabled title="Baixar">⬇ Baixar</button>
+          </div>
+        </div>
+        <div class="code-area">
+          <div class="code-empty" id="code-empty">Nenhum código gerado ainda</div>
+          <pre id="code-output" style="display:none"></pre>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- LOG -->
+    <div class="log-bar">
+      <div class="log-header">⬛ Log</div>
+      <div id="status-log"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ======================================================
+// CONSTANTES
+// ======================================================
+
+const GEMINI_MODELS = ["gemini-2.5-flash"];
+const GROQ_MODELS = ["llama-3.3-70b-versatile", "deepseek-r1-distill-llama-70b"];
+
+let isGenerating = false;
+let abortController = null;
+let currentCode = "";
+
+// ======================================================
+// SYSTEM PROMPT
+// ======================================================
+
+const SYSTEM_PROMPT = `
+OMEGA AUTO SOFTWARE FACTORY PRO MODE
+
+IDENTIDADE:
+Você é uma IA de engenharia de software profissional multi-especialista.
+
+MISSÃO: Transformar qualquer pedido em software REAL, COMPLETO, PROFISSIONAL e 100% FUNCIONAL.
+
+PROCESSO INTERNO OBRIGATÓRIO:
+Antes de responder, internamente:
+1. Analise o pedido completo
+2. Planeje a arquitetura ideal
+3. Escreva TODO o código antes de começar a gerar
+4. Verifique se nada está faltando
+5. Somente então gere a saída final
+
+REGRAS DE QUALIDADE:
+- Design premium e moderno
+- Totalmente responsivo
+- Animações suaves
+- Tudo funcional (botões, forms, navegação)
+- Código limpo e robusto
+- Use localStorage quando precisar persistir dados
+- NUNCA deixe função vazia ou incompleta
+
+REGRA DE COMPLETUDE - CRÍTICA:
+- Escreva TODAS as funções COMPLETAS, do início ao fim
+- NUNCA use comentários como "// resto aqui", "// continua...", "// implemente aqui"
+- NUNCA abrevie o código
+- Se o código for grande, use técnicas para deixá-lo compacto SEM remover funcionalidade
+
+PROIBIDO:
+- Código parcial ou funções vazias
+- Placeholders falsos
+- Botões sem ação
+- Links quebrados
+- Markdown, JSON ou texto extra
+- Blocos de código com crases
+- Comentários indicando código omitido
+
+FORMATO DE SAÍDA OBRIGATÓRIO:
+- APENAS código HTML completo, nada mais
+- Iniciar EXATAMENTE com <!DOCTYPE html>
+- CSS dentro de <style> no <head>
+- JavaScript dentro de <script> antes de </body>
+- NUNCA retornar CSS ou JS soltos fora do HTML
+- A última linha DEVE ser </html>
+`;
+
+// ======================================================
+// DOM READY
+// ======================================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  atualizarModelos();
+  configurarResponsivo();
+
+  document.getElementById("generate-btn").addEventListener("click", gerarProjeto);
+  document.getElementById("stop-btn").addEventListener("click", pararGeracao);
+  document.getElementById("api-provider").addEventListener("change", atualizarModelos);
+
+  document.getElementById("eye-btn").addEventListener("click", () => {
+    const input = document.getElementById("api-key");
+    input.type = input.type === "password" ? "text" : "password";
+  });
+
+  document.getElementById("prompt").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) gerarProjeto();
+  });
+});
+
+// ======================================================
+// MODELOS
+// ======================================================
+
+function atualizarModelos() {
+  const provider = document.getElementById("api-provider").value;
+  const select = document.getElementById("model-select");
+  const models = provider === "gemini" ? GEMINI_MODELS : GROQ_MODELS;
+  select.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join("");
+}
+
+// ======================================================
+// LOG
+// ======================================================
+
+function addLog(texto) {
+  const log = document.getElementById("status-log");
+  const p = document.createElement("p");
+  p.textContent = new Date().toLocaleTimeString() + " — " + texto;
+  log.appendChild(p);
+  log.scrollTop = log.scrollHeight;
+}
+
+// ======================================================
+// DETECÇÃO DE CÓDIGO CORTADO
+// ======================================================
+
+function isCodeCut(code) {
+  const t = code.trim();
+  if (!t.toLowerCase().endsWith("</html>")) return true;
+  if (!t.toLowerCase().includes("</body>")) return true;
+  const sOpens = (t.match(/<script/gi) || []).length;
+  const sCloses = (t.match(/<\/script>/gi) || []).length;
+  if (sOpens > sCloses) return true;
+  const opens = (t.match(/\{/g) || []).length;
+  const closes = (t.match(/\}/g) || []).length;
+  if (opens - closes > 5) return true;
+  return false;
+}
+
+// ======================================================
+// LIMPEZA
+// ======================================================
+
+function cleanCode(raw) {
+  let code = raw
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/```html\s*/gi, "")
+    .replace(/```javascript\s*/gi, "")
+    .replace(/```css\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .replace(/^[\s\S]*?(?=<!DOCTYPE html>|<html)/i, "")
+    .trim();
+
+  if (!code.toLowerCase().startsWith("<!doctype")) {
+    const idx = code.toLowerCase().indexOf("<html");
+    if (idx > 0) code = code.substring(idx);
+    code = "<!DOCTYPE html>\n" + code;
+  }
+
+  if (!code.toLowerCase().includes("<html")) {
+    code = `<!DOCTYPE html>\n<html lang="pt-BR">\n<head>\n<meta charset="UTF-8">\n<style>body{font-family:Arial,sans-serif;padding:20px}</style>\n</head>\n<body>\n${code}\n</body>\n</html>`;
+  }
+
+  if (isCodeCut(code)) {
+    const sOpens = (code.match(/<script/gi) || []).length;
+    const sCloses = (code.match(/<\/script>/gi) || []).length;
+    let fix = code;
+    for (let i = 0; i < sOpens - sCloses; i++) fix += "\n}catch(e){}\n</script>";
+    if (!fix.toLowerCase().includes("</body>")) fix += "\n</body>";
+    if (!fix.toLowerCase().endsWith("</html>")) fix += "\n</html>";
+    return fix;
+  }
+
+  return code;
+}
+
+// ======================================================
+// FETCH COM RETRY
+// ======================================================
+
+async function fetchComRetry(url, options, tentativas = 3) {
+  for (let i = 0; i < tentativas; i++) {
+    const response = await fetch(url, options);
+    if (response.ok) return response;
+    if (i < tentativas - 1) await new Promise(r => setTimeout(r, 1500));
+  }
+  throw new Error("Falha após múltiplas tentativas");
+}
+
+// ======================================================
+// GERAR PROJETO
+// ======================================================
+
+async function gerarProjeto() {
+  if (isGenerating) return;
+
+  const prompt = document.getElementById("prompt").value.trim();
+  const apiKey = document.getElementById("api-key").value.trim();
+  const provider = document.getElementById("api-provider").value;
+  const model = document.getElementById("model-select").value;
+
+  if (!prompt || !apiKey) {
+    addLog("⚠ Preencha o prompt e a API Key");
+    return;
+  }
+
+  isGenerating = true;
+  abortController = new AbortController();
+
+  const btn = document.getElementById("generate-btn");
+  const stopBtn = document.getElementById("stop-btn");
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Gerando...';
+  stopBtn.classList.remove("hidden");
+
+  addLog("⏳ Enviando para " + provider + " (" + model + ")...");
+
+  const url = provider === "gemini"
+    ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+    : "https://api.groq.com/openai/v1/chat/completions";
+
+  const userMessage = `INSTRUÇÕES CRÍTICAS DE ENTREGA:
+- RESPONDA APENAS COM O DOCUMENTO HTML COMPLETO E 100% FUNCIONAL
+- COMEÇAR EXATAMENTE COM <!DOCTYPE html>
+- CSS DENTRO DE <style> NO <head>
+- JAVASCRIPT DENTRO DE <script> ANTES DE </body>
+- PROIBIDO ABREVIAR: Escreva TODAS as funções por completo
+- PROIBIDO comentários como "// resto do código", "// continua aqui"
+- A ÚLTIMA LINHA OBRIGATORIAMENTE DEVE SER </html>
+- NÃO inclua nenhum texto fora do HTML
+
+PEDIDO DO USUÁRIO:
+${prompt}`;
+
+  const body = provider === "gemini"
+    ? {
+        contents: [{ parts: [{ text: SYSTEM_PROMPT + "\n\n" + userMessage }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 65536 }
+      }
+    : {
+        model,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userMessage }
+        ],
+        max_tokens: 32768,
+        temperature: 0.25
+      };
+
+  const headers = { "Content-Type": "application/json" };
+  if (provider === "groq") headers["Authorization"] = "Bearer " + apiKey;
+
+  const response = await fetchComRetry(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    signal: abortController.signal
+  });
+
+  const data = await response.json();
+
+  if (data.error) throw new Error("Erro da API: " + (data.error.message || JSON.stringify(data.error)));
+
+  const raw = provider === "gemini"
+    ? data?.candidates?.[0]?.content?.parts?.[0]?.text || ""
+    : data?.choices?.[0]?.message?.content || "";
+
+  const finishReason = data?.choices?.[0]?.finish_reason;
+  if (finishReason === "length") addLog("⚠ Limite de tokens atingido — aplicando correção automática...");
+
+  const geminiReason = data?.candidates?.[0]?.finishReason;
+  if (geminiReason && geminiReason !== "STOP") addLog("⚠ Gemini parou: " + geminiReason + " — aplicando correção...");
+
+  if (!raw || !raw.trim()) throw new Error("A IA retornou resposta vazia. Tente novamente.");
+
+  addLog("🧹 Limpando e validando código...");
+  const code = cleanCode(raw);
+  currentCode = code;
+
+  if (isCodeCut(raw)) addLog("🔧 Código incompleto detectado — correção aplicada.");
+  else addLog("✅ Código validado com sucesso.");
+
+  // Mostra preview
+  const frame = document.getElementById("output-frame");
+  const empty = document.getElementById("preview-empty");
+  frame.srcdoc = code;
+  frame.style.display = "block";
+  empty.style.display = "none";
+
+  // Mostra código
+  const codeOut = document.getElementById("code-output");
+  const codeEmpty = document.getElementById("code-empty");
+  codeOut.textContent = code;
+  codeOut.style.display = "block";
+  codeEmpty.style.display = "none";
+
+  document.getElementById("copy-btn").disabled = false;
+  document.getElementById("download-btn").disabled = false;
+
+  addLog("✓ Pronto! Projeto gerado.");
+
+  isGenerating = false;
+  btn.disabled = false;
+  btn.innerHTML = '<span>✨</span> Gerar Projeto';
+  stopBtn.classList.add("hidden");
+}
+
+// ======================================================
+// PARAR
+// ======================================================
+
+function pararGeracao() {
+  abortController?.abort();
+  isGenerating = false;
+  document.getElementById("generate-btn").disabled = false;
+  document.getElementById("generate-btn").innerHTML = '<span>✨</span> Gerar Projeto';
+  document.getElementById("stop-btn").classList.add("hidden");
+  addLog("✕ Geração cancelada.");
+}
+
+// ======================================================
+// ABAS
+// ======================================================
+
+function switchTab(tab, btn) {
+  document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById("tab-" + tab).classList.add("active");
+  btn.classList.add("active");
+}
+
+// ======================================================
+// COPIAR / BAIXAR
+// ======================================================
+
+function copyCode() {
+  if (!currentCode) return;
+  navigator.clipboard.writeText(currentCode).then(() => {
+    const btn = document.getElementById("copy-btn");
+    btn.textContent = "✅ Copiado!";
+    setTimeout(() => btn.innerHTML = "📋 Copiar", 2000);
+  });
+}
+
+function downloadCode() {
+  if (!currentCode) return;
+  const blob = new Blob([currentCode], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "projeto.html";
+  a.click();
+  URL.revokeObjectURL(url);
+  addLog("⬇ Arquivo baixado: projeto.html");
+}
+
+// ======================================================
+// PREVIEW RESPONSIVO
+// ======================================================
+
+function configurarResponsivo() {
+  const labels = { desktop: "100%", tablet: "768px", mobile: "375px" };
+  document.querySelectorAll(".resp-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const view = btn.dataset.view;
+      const wrapper = document.getElementById("iframe-wrapper");
+      wrapper.className = "iframe-wrapper view-" + view;
+      document.querySelectorAll(".resp-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("view-label").textContent = labels[view];
+    });
+  });
+}
+</script>
+
+</body>
+</html>
