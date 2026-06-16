@@ -1,26 +1,16 @@
 const GEMINI_MODELS=["gemini-2.5-flash","gemini-2.0-flash"];
-const GROQ_MODELS=["llama-3.3-70b-versatile","deepseek-r1-distill-llama-70b"];
+const GROQ_MODELS=["llama-3.3-70b-versatile","deepseek-r1-distill-llama-70b","llama3-70b-8192"];
 let isGenerating=false,abortController=null,currentCode="",editMode=false,currentProjectId=null;
 const STORAGE_KEY="omega_projects_v2";
 
 const SYSTEM_PROMPT=`
-OMEGA AUTO SOFTWARE FACTORY PRO MODE — MULTI-FILE ARCHITECT
-MISSÃO: Transformar qualquer especificação em um ecossistema de software REAL, ROBUSTO, INTEGRAL e 100% OPERACIONAL.
-
-REGRAS DE ESTRUTURAÇÃO (MULTI-ARQUIVOS):
-- Você NÃO está limitado a um único arquivo. Crie uma arquitetura modular limpa e profissional.
-- Divida o sistema nos arquivos necessários para sua escala (ex: index.html, style.css, app.js, player.js, api.js, manifest.json).
-- SEPARE CADA ARQUIVO EXPLICITAMENTE usando a seguinte marcação exata:
-=== ARQUIVO: nome_do_arquivo.extensao ===
-[Insira o código completo do arquivo aqui sem abreviações]
-
-DIRETRIZES DE COMPLETUDE ABSOLUTA:
-- LEIA 100% DO PEDIDO DO USUÁRIO. Desenvolva cada detalhe solicitado com rigor técnico.
-- NUNCA use placeholders, reticências (...) ou comentários de omissão como "// código omitido", "/* adicione aqui */", ou "funcionalidade não implementada".
-- Escreva TODA a lógica interna de cada função. Se precisar simular APIs ou Banco de Dados, use estruturas complexas em localStorage / sessionStorage dentro dos arquivos JS.
-- O design visual deve ser premium, responsivo, moderno, utilizando variáveis organizadas no CSS, flexbox/grid e animações fluidas.
-- Entregue engenharia de software real e pronta para uso imediato.
-- Não inclua explicações em prosa fora dos blocos de arquivos estruturados.
+OMEGA AUTO SOFTWARE FACTORY PRO MODE
+MISSÃO: Transformar qualquer pedido em software REAL, COMPLETO, PROFISSIONAL e 100% FUNCIONAL.
+PROCESSO: 1.Analise 2.Planeje 3.Escreva TUDO 4.Verifique 5.Gere
+REGRAS: Design premium, responsivo, animações, tudo funcional, localStorage para dados, NUNCA função vazia.
+COMPLETUDE: Escreva TODAS funções completas. NUNCA "// resto aqui". NUNCA abrevie.
+PROIBIDO: código parcial, placeholders, botões sem ação, markdown, crases, comentários de omissão.
+FORMATO: APENAS HTML completo. Iniciar com <!DOCTYPE html>. CSS em <style>. JS em <script>. Última linha </html>.
 `;
 
 // ── Storage ──────────────────────────────────────────────────────────────────
@@ -78,26 +68,51 @@ function newProject(){
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded",()=>{
+  
+  // [Melhoria 2] Carregar Provedor salvo antes de atualizar os modelos da lista
   const savedProvider = localStorage.getItem("omega_provider");
   if(savedProvider){
     document.getElementById("api-provider").value = savedProvider;
   }
+
   atualizarModelos();
   configurarResponsivo();
   renderHistory();
+  
+  // [Melhoria 1] Carregar API Key salva
   const savedKey = localStorage.getItem("omega_api_key");
-  if(savedKey){document.getElementById("api-key").value = savedKey;}
+  if(savedKey){
+    document.getElementById("api-key").value = savedKey;
+  }
+
+  // [Melhoria 4] Carregar Prompt salvo
   const promptField = document.getElementById("prompt");
   promptField.value = localStorage.getItem("omega_prompt") || "";
 
+  // Ouvintes de Eventos para os botões principais
   document.getElementById("generate-btn").addEventListener("click",gerarProjeto);
   document.getElementById("stop-btn").addEventListener("click",pararGeracao);
-  document.getElementById("api-provider").addEventListener("change", e => {localStorage.setItem("omega_provider", e.target.value);atualizarModelos();});
-  document.getElementById("api-key").addEventListener("input", e => {localStorage.setItem("omega_api_key", e.target.value);});
-  promptField.addEventListener("input", () => {localStorage.setItem("omega_prompt", promptField.value);});
+  
+  // [Melhoria 2] Salvar Provedor automaticamente ao mudar e atualizar lista de modelos
+  document.getElementById("api-provider").addEventListener("change", e => {
+    localStorage.setItem("omega_provider", e.target.value);
+    atualizarModelos();
+  });
+
+  // [Melhoria 1] Salvar API Key automaticamente ao digitar
+  document.getElementById("api-key").addEventListener("input", e => {
+    localStorage.setItem("omega_api_key", e.target.value);
+  });
+
+  // [Melhoria 4] Salvar Prompt automaticamente ao digitar
+  promptField.addEventListener("input", () => {
+    localStorage.setItem("omega_prompt", promptField.value);
+  });
+
   document.getElementById("eye-btn").addEventListener("click",()=>{const i=document.getElementById("api-key");i.type=i.type==="password"?"text":"password";});
   document.getElementById("prompt").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))gerarProjeto();});
   
+  // Escutar alterações do editor visual vindas do iframe
   window.addEventListener("message",e=>{
     if(e.data?.type==="omega_text_edit"&&e.data.html){
       currentCode="<!DOCTYPE html>\n"+e.data.html;
@@ -120,59 +135,21 @@ function addLog(txt){
 }
 function isCodeCut(c){
   const t=c.trim();
-  if(t.includes("=== ARQUIVO:")) return false; 
   if(!t.toLowerCase().endsWith("</html>"))return true;
   if(!t.toLowerCase().includes("</body>"))return true;
   const so=(t.match(/<script/gi)||[]).length,sc=(t.match(/<\/script>/gi)||[]).length;
   if(so>sc)return true;
+  const op=(t.match(/\{/g)||[]).length,cl=(t.match(/\}/g)||[]).length;
+  if(op-cl>5)return true;
   return false;
 }
 function cleanCode(raw){
-  let code=raw.replace(/<think>[\s\S]*?<\/think>/gi,"").replace(/```html\s*/gi,"").replace(/```javascript\s*/gi,"").replace(/```css\s*/gi,"").replace(/```\s*/g,"").trim();
-  if(code.includes("=== ARQUIVO:")) return code;
+  let code=raw.replace(/<think>[\s\S]*?<\/think>/gi,"").replace(/```html\s*/gi,"").replace(/```javascript\s*/gi,"").replace(/```css\s*/gi,"").replace(/```\s*/g,"").replace(/^[\s\S]*?(?=<!DOCTYPE html>|<html)/i,"").trim();
   if(!code.toLowerCase().startsWith("<!doctype")){const idx=code.toLowerCase().indexOf("<html");if(idx>0)code=code.substring(idx);code="<!DOCTYPE html>\n"+code;}
   if(!code.toLowerCase().includes("<html")){code=`<!DOCTYPE html>\n<html lang="pt-BR">\n<head>\n<meta charset="UTF-8">\n<style>body{font-family:Arial,sans-serif;padding:20px}</style>\n</head>\n<body>\n${code}\n</body>\n</html>`;}
   if(isCodeCut(code)){const so=(code.match(/<script/gi)||[]).length,sc=(code.match(/<\/script>/gi)||[]).length;let fix=code;for(let i=0;i<so-sc;i++)fix+="\n}catch(e){}\n</script>";if(!fix.toLowerCase().includes("</body>"))fix+="\n</body>";if(!fix.toLowerCase().endsWith("</html>"))fix+="\n</html>";return fix;}
   return code;
 }
-
-function buildPreviewCode(raw){
-  if(!raw.includes("=== ARQUIVO:")) return raw;
-  const parts = raw.split(/===\s*ARQUIVO:\s*([\w\.\-]+)\s*===/i);
-  const files = {};
-  for (let i = 1; i < parts.length; i += 2) {
-    const filename = parts[i].trim().toLowerCase();
-    const content = parts[i+1] ? parts[i+1].trim() : "";
-    files[filename] = content;
-  }
-  let html = files["index.html"] || "";
-  if(!html){
-    const firstKey = Object.keys(files)[0];
-    html = files[firstKey] || raw;
-  }
-  if(files["style.css"]){
-    if(html.toLowerCase().includes("</head>")){
-      html = html.replace(/<\/head>/i, `<style>${files["style.css"]}</style>\n</head>`);
-    } else {
-      html += `<style>${files["style.css"]}</style>`;
-    }
-  }
-  let scripts = "";
-  Object.keys(files).forEach(name => {
-    if(name.endsWith(".js") && files[name]){
-      scripts += `\n<script>\n// Módulo Emulado: ${name}\n${files[name]}\n<\/script>\n`;
-    }
-  });
-  if(scripts){
-    if(html.toLowerCase().includes("</body>")){
-      html = html.replace(/<\/body>/i, `${scripts}\n</body>`);
-    } else {
-      html += scripts;
-    }
-  }
-  return html;
-}
-
 async function robustFetch(url,options){
   const response=await fetch(url,options);
   const data=await response.json().catch(()=>null);
@@ -181,74 +158,38 @@ async function robustFetch(url,options){
   return data;
 }
 
-// ── Chamada da API Adaptada para o Loop de Continuação ────────────────────────
-async function callAPI(promptText, isContinuation = false, previousCode = ""){
+async function callAPI(promptText){
   const apiKey=document.getElementById("api-key").value.trim();
-  if(!apiKey) throw new Error("API Key não informada.");
-  if(apiKey.length < 20) throw new Error("API Key inválida.");
+
+  // [Melhoria 6] Detector de Erros da API Key antes da requisição
+  if(!apiKey){
+    throw new Error("API Key não informada.");
+  }
+  if(apiKey.length < 20){
+    throw new Error("API Key inválida.");
+  }
 
   const provider=document.getElementById("api-provider").value;
   const model=document.getElementById("model-select").value;
   const isGemini=provider==="gemini";
   const url=isGemini?`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`:"https://api.groq.com/openai/v1/chat/completions";
-  
-  let userMsg = "";
-
-  if(isContinuation){
-    userMsg = `CONTINUE EXATAMENTE DE ONDE PAROU.
-NÃO REPITA NADA DO QUE JÁ FOI ESCRITO.
-NÃO FAÇA INTRODUÇÕES.
-
-ÚLTIMA SAÍDA:
-${previousCode.slice(-5000)}`;
-  } else {
-    userMsg = `ATENÇÃO:
-LEIA 100% DO PEDIDO.
-NÃO RESUMA. NÃO CRIE EXEMPLOS.
-NÃO ESCREVA EM HIPÓTESE ALGUMA FRASES COMO:
-"este é apenas um exemplo"
-"funcionalidade não implementada"
-"backend necessário"
-"adicione o código aqui"
-"código omitido por espaço"
-"restante do código..."
-
-NUNCA OMITA CÓDIGO.
-
-OBRIGATÓRIO:
-- Implementar todas as funções declaradas.
-- Implementar todos os botões e interações visuais.
-- Implementar toda a lógica de estado do sistema.
-- Entregar a aplicação 100% pronta para uso imediato.
-- Gerar milhares de linhas se o projeto demandar.
-
-PEDIDO DO USUÁRIO:
-${promptText}`;
-  }
-
-  // Substituição de max_tokens por max_completion_tokens
+  const userMsg=`INSTRUÇÕES CRÍTICAS: RESPONDA APENAS COM HTML COMPLETO. COMEÇAR COM <!DOCTYPE html>. CSS em <style>. JS em <script>. ÚLTIMA LINHA </html>. PROIBIDO abreviar.\n\n${promptText}`;
   const body=isGemini
     ?{contents:[{parts:[{text:SYSTEM_PROMPT+"\n\n"+userMsg}]}],generationConfig:{temperature:0.3,maxOutputTokens:65536}}
-    :{model,messages:[{role:"system",content:SYSTEM_PROMPT},{role:"user",content:userMsg}],max_completion_tokens:8192,temperature:0.2};
-  
+    :{model,messages:[{role:"system",content:SYSTEM_PROMPT},{role:"user",content:userMsg}],max_tokens:32768,temperature:0.25};
   const headers={"Content-Type":"application/json"};
   if(!isGemini)headers["Authorization"]="Bearer "+apiKey;
   const data=await robustFetch(url,{method:"POST",headers,body:JSON.stringify(body),signal:abortController?.signal});
-  
   const raw=isGemini?data?.candidates?.[0]?.content?.parts?.[0]?.text||"":data?.choices?.[0]?.message?.content||"";
-  
-  // Padroniza a resposta para o Loop
-  const finishReason = isGemini ? data?.candidates?.[0]?.finishReason : data?.choices?.[0]?.finish_reason;
-  
-  if(!raw||!raw.trim())throw new Error("A IA retornou uma resposta vazia.");
-  
-  return { content: raw, finishReason: finishReason };
+  if(data?.choices?.[0]?.finish_reason==="length")addLog("⚠ Limite de tokens — corrigindo...");
+  const gr=data?.candidates?.[0]?.finishReason;
+  if(gr&&gr!=="STOP")addLog("⚠ Gemini parou: "+gr);
+  if(!raw||!raw.trim())throw new Error("A IA retornou resposta vazia. Verifique sua API Key.");
+  return cleanCode(raw);
 }
-
 function showCode(code){
   const frame=document.getElementById("output-frame");
-  frame.srcdoc=buildPreviewCode(code);
-  frame.style.display="block";
+  frame.srcdoc=code;frame.style.display="block";
   document.getElementById("preview-empty").style.display="none";
   const co=document.getElementById("code-output");co.textContent=code;co.style.display="block";
   document.getElementById("code-empty").style.display="none";
@@ -256,162 +197,95 @@ function showCode(code){
   document.getElementById("download-btn").disabled=false;
   if(editMode)injectEditor();
 }
-
-// ── Loop de Geração Automática ────────────────────────────────────────────────
 async function gerarProjeto(){
   if(isGenerating)return;
   const prompt=document.getElementById("prompt").value.trim();
   const apiKey=document.getElementById("api-key").value.trim();
   if(!prompt||!apiKey){addLog("⚠ Preencha o prompt e a API Key");return;}
-  
-  isGenerating=true;
-  abortController=new AbortController();
+  isGenerating=true;abortController=new AbortController();
   const btn=document.getElementById("generate-btn"),stopBtn=document.getElementById("stop-btn");
-  btn.disabled=true;
-  btn.innerHTML='<span class="spinner"></span> Construindo Fábrica...';
-  stopBtn.classList.remove("hidden");
-  
-  let fullCode = "";
-  let done = false;
-  let isContinuation = false;
-
-  addLog("⏳ Analisando arquitetura e iniciando geração...");
-
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Gerando...';stopBtn.classList.remove("hidden");
+  addLog("⏳ Gerando projeto...");
   try{
-    while(!done){
-      if(abortController?.signal?.aborted){
-        throw new Error("abort");
-      }
-
-      const result = await callAPI(prompt, isContinuation, fullCode);
-      
-      // Limpa as tags de formatação soltas que a IA possa colocar na continuação
-      let newContent = result.content.replace(/```html\s*/gi,"").replace(/```javascript\s*/gi,"").replace(/```css\s*/gi,"").replace(/```\s*/g,"");
-      
-      fullCode += newContent;
-
-      // Verificações das APIs (Gemini retorna MAX_TOKENS, Groq retorna length)
-      if(result.finishReason === "length" || result.finishReason === "MAX_TOKENS"){
-        addLog("⏳ Limite de janela atingido. Injetando continuação automática...");
-        isContinuation = true;
-      } else {
-        done = true;
-      }
-    }
-
-    const finalCleanCode = cleanCode(fullCode);
-    currentCode=finalCleanCode;
-    currentProjectId=null;
-    showCode(finalCleanCode);
-    saveCurrentProject();
-    addLog("✓ Ecossistema massivo gerado com sucesso!");
-
+    const code=await callAPI("PEDIDO DO USUÁRIO:\n"+prompt);
+    currentCode=code;currentProjectId=null;
+    showCode(code);saveCurrentProject();
+    addLog("✓ Projeto gerado e salvo!");
   }catch(e){
-    if(e.name==="AbortError"||e.message?.includes("abort"))addLog("✕ Processo interrompido.");
-    else addLog("❌ Falha na Construção: "+e.message);
+    if(e.name==="AbortError"||e.message?.includes("abort"))addLog("✕ Geração cancelada.");
+    else addLog("❌ Erro: "+e.message);
   }finally{
-    isGenerating=false;
-    btn.disabled=false;
-    btn.innerHTML='<span>✨</span> Gerar Projeto';
-    stopBtn.classList.add("hidden");
+    isGenerating=false;btn.disabled=false;btn.innerHTML='<span>✨</span> Gerar Projeto';stopBtn.classList.add("hidden");
   }
 }
-
 async function runImprovement(improvPrompt){
-  if(!currentCode){addLog("⚠ Nenhum ecossistema ativo para aplicar melhorias.");return;}
+  if(!currentCode){addLog("⚠ Gere um projeto primeiro");return;}
   const apiKey=document.getElementById("api-key").value.trim();
   if(!apiKey){addLog("⚠ Configure a API Key");return;}
-  
-  isGenerating=true;
-  abortController=new AbortController();
-  const btns=document.querySelectorAll(".quick-btn,.btn-generate");
-  btns.forEach(b=>b.disabled=true);
-  addLog("🪄 Refatorando arquitetura...");
-  
-  let fullCode = "";
-  let done = false;
-  let isContinuation = false;
-
+  isGenerating=true;abortController=new AbortController();
+  const btns=document.querySelectorAll(".quick-btn,.btn-generate");btns.forEach(b=>b.disabled=true);
+  addLog("🪄 IA Assistente aplicando melhoria...");
   try{
-    while(!done){
-      if(abortController?.signal?.aborted) throw new Error("abort");
-
-      let promptToSend = "";
-      if(isContinuation){
-        promptToSend = "CONTINUE"; // callAPI já trata a continuação internamente
-      } else {
-        promptToSend = `MODO REFATORAÇÃO DE ESCOPO — REGRAS: Mantenha todos os módulos existentes intactos. Adicione/modifique estritamente o necessário.\nMELHORIA: ${improvPrompt}\nCÓDIGO ATUAL:\n${currentCode}`;
-      }
-
-      const result=await callAPI(promptToSend, isContinuation, fullCode);
-      let newContent = result.content.replace(/```html\s*/gi,"").replace(/```javascript\s*/gi,"").replace(/```css\s*/gi,"").replace(/```\s*/g,"");
-      fullCode += newContent;
-
-      if(result.finishReason === "length" || result.finishReason === "MAX_TOKENS"){
-        addLog("⏳ Refatoração longa. Continuando automaticamente...");
-        isContinuation = true;
-      } else {
-        done = true;
-      }
-    }
-    
-    const finalCleanCode = cleanCode(fullCode);
-    currentCode=finalCleanCode;
-    showCode(finalCleanCode);
-    saveCurrentProject();
-    addLog("✅ Arquitetura atualizada e salva com sucesso!");
+    const fullPrompt=`MODO MELHORIA — REGRAS ABSOLUTAS: mantenha TODAS as funcionalidades. APENAS adicione/melhore, NUNCA remova.\n\nMELHORIA: ${improvPrompt}\n\nCÓDIGO ATUAL:\n${currentCode}`;
+    const improved=await callAPI(fullPrompt);
+    currentCode=improved;showCode(improved);saveCurrentProject();
+    addLog("✅ Melhoria aplicada e salva!");
   }catch(e){
     if(e.name==="AbortError"||e.message?.includes("abort"))addLog("✕ Cancelado.");
-    else addLog("❌ Erro na refatoração: "+e.message);
+    else addLog("❌ Erro na melhoria: "+e.message);
   }finally{
-    isGenerating=false;
-    btns.forEach(b=>b.disabled=false);
+    isGenerating=false;btns.forEach(b=>b.disabled=false);
   }
 }
-
 function runCustomImprovement(){
   const p=document.getElementById("improve-prompt").value.trim();
   if(!p){addLog("⚠ Descreva a melhoria");return;}
   runImprovement(p);document.getElementById("improve-prompt").value="";
 }
-
 function pararGeracao(){
   abortController?.abort();isGenerating=false;
   document.getElementById("generate-btn").disabled=false;
   document.getElementById("generate-btn").innerHTML='<span>✨</span> Gerar Projeto';
   document.getElementById("stop-btn").classList.add("hidden");
   document.querySelectorAll(".quick-btn").forEach(b=>b.disabled=false);
-  addLog("✕ Operação cancelada manualmente.");
+  addLog("✕ Geração cancelada.");
 }
 
+// [Melhoria 5] Nova Função Corrigida de Troca de Aba
 function switchTab(tab, btn){
-  document.querySelectorAll(".tab-content").forEach(el=>{el.classList.remove("active");});
-  document.querySelectorAll(".tab-btn").forEach(el=>{el.classList.remove("active");});
+  document.querySelectorAll(".tab-content").forEach(el=>{
+    el.classList.remove("active");
+  });
+  document.querySelectorAll(".tab-btn").forEach(el=>{
+    el.classList.remove("active");
+  });
   document.getElementById(`tab-${tab}`).classList.add("active");
-  if(btn){btn.classList.add("active");}
+  if(btn){
+    btn.classList.add("active");
+  }
 }
 
 function copyCode(){
   if(!currentCode)return;
   navigator.clipboard.writeText(currentCode).then(()=>{
     const btn=document.getElementById("copy-btn");btn.textContent="✅ Copiado!";
-    setTimeout(()=>btn.innerHTML="📋 Copiar Código",2000);
+    setTimeout(()=>btn.innerHTML="📋 Copiar",2000);
   });
 }
 
+// [Melhoria 3] Nova Função de Exportação Avançada para downloadCode()
 async function downloadCode(){
   if(!currentCode) return;
-  const isMulti = currentCode.includes("=== ARQUIVO:");
   const blob = new Blob([currentCode], {
-    type: isMulti ? "text/plain" : "text/html"
+    type: "text/html"
   });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = isMulti ? "pacote_projeto_completo.txt" : "index.html";
+  a.download = "index.html";
   a.click();
   URL.revokeObjectURL(url);
-  addLog("📦 Ecossistema exportado.");
+  addLog("📦 Projeto exportado.");
 }
 
 function configurarResponsivo(){
@@ -425,13 +299,12 @@ function configurarResponsivo(){
     });
   });
 }
-
 function toggleAI(){
   const body=document.getElementById("ai-body"),ch=document.getElementById("ai-chevron");
   const open=body.style.display==="none";
   body.style.display=open?"flex":"none";ch.textContent=open?"▲":"▼";
 }
-
+// ── Visual Editor ────────────────────────────────────────────────────────────
 function toggleEdit(){
   editMode=!editMode;
   const btn=document.getElementById("edit-btn"),badge=document.getElementById("edit-badge");
@@ -439,9 +312,8 @@ function toggleEdit(){
   btn.style.color=editMode?"var(--primary)":"var(--muted)";
   badge.style.display=editMode?"inline-flex":"none";
   if(editMode)injectEditor();else removeEditor();
-  addLog(editMode?"✏ Editor visual ativo":"✏ Editor visual desativado.");
+  addLog(editMode?"✏ Editor visual ativado — clique em textos para editar":"✏ Editor visual desativado.");
 }
-
 function injectEditor(){
   const iframe=document.getElementById("output-frame");
   if(!iframe||!iframe.contentDocument)return;
@@ -466,7 +338,6 @@ function injectEditor(){
     node=walker.nextNode();
   }
 }
-
 function removeEditor(){
   const iframe=document.getElementById("output-frame");
   if(!iframe||!iframe.contentDocument)return;
