@@ -1,10 +1,8 @@
-// [Problema 4] Modelos otimizados para produções massivas e complexas
 const GEMINI_MODELS=["gemini-2.5-flash","gemini-2.0-flash"];
 const GROQ_MODELS=["llama-3.3-70b-versatile","deepseek-r1-distill-llama-70b"];
 let isGenerating=false,abortController=null,currentCode="",editMode=false,currentProjectId=null;
 const STORAGE_KEY="omega_projects_v2";
 
-// [Problema 5] SYSTEM_PROMPT Expandido de Nível Corporativo
 const SYSTEM_PROMPT=`
 OMEGA AUTO SOFTWARE FACTORY PRO MODE — MULTI-FILE ARCHITECT
 MISSÃO: Transformar qualquer especificação em um ecossistema de software REAL, ROBUSTO, INTEGRAL e 100% OPERACIONAL.
@@ -84,35 +82,19 @@ document.addEventListener("DOMContentLoaded",()=>{
   if(savedProvider){
     document.getElementById("api-provider").value = savedProvider;
   }
-
   atualizarModelos();
   configurarResponsivo();
   renderHistory();
-  
   const savedKey = localStorage.getItem("omega_api_key");
-  if(savedKey){
-    document.getElementById("api-key").value = savedKey;
-  }
-
+  if(savedKey){document.getElementById("api-key").value = savedKey;}
   const promptField = document.getElementById("prompt");
   promptField.value = localStorage.getItem("omega_prompt") || "";
 
   document.getElementById("generate-btn").addEventListener("click",gerarProjeto);
   document.getElementById("stop-btn").addEventListener("click",pararGeracao);
-  
-  document.getElementById("api-provider").addEventListener("change", e => {
-    localStorage.setItem("omega_provider", e.target.value);
-    atualizarModelos();
-  });
-
-  document.getElementById("api-key").addEventListener("input", e => {
-    localStorage.setItem("omega_api_key", e.target.value);
-  });
-
-  promptField.addEventListener("input", () => {
-    localStorage.setItem("omega_prompt", promptField.value);
-  });
-
+  document.getElementById("api-provider").addEventListener("change", e => {localStorage.setItem("omega_provider", e.target.value);atualizarModelos();});
+  document.getElementById("api-key").addEventListener("input", e => {localStorage.setItem("omega_api_key", e.target.value);});
+  promptField.addEventListener("input", () => {localStorage.setItem("omega_prompt", promptField.value);});
   document.getElementById("eye-btn").addEventListener("click",()=>{const i=document.getElementById("api-key");i.type=i.type==="password"?"text":"password";});
   document.getElementById("prompt").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))gerarProjeto();});
   
@@ -138,7 +120,7 @@ function addLog(txt){
 }
 function isCodeCut(c){
   const t=c.trim();
-  if(t.includes("=== ARQUIVO:")) return false; // Ignora validação antiga se for arquitetura modular
+  if(t.includes("=== ARQUIVO:")) return false; 
   if(!t.toLowerCase().endsWith("</html>"))return true;
   if(!t.toLowerCase().includes("</body>"))return true;
   const so=(t.match(/<script/gi)||[]).length,sc=(t.match(/<\/script>/gi)||[]).length;
@@ -147,20 +129,15 @@ function isCodeCut(c){
 }
 function cleanCode(raw){
   let code=raw.replace(/<think>[\s\S]*?<\/think>/gi,"").replace(/```html\s*/gi,"").replace(/```javascript\s*/gi,"").replace(/```css\s*/gi,"").replace(/```\s*/g,"").trim();
-  
-  // Se for arquitetura modular de arquivos, preserva a estrutura crua intacta
   if(code.includes("=== ARQUIVO:")) return code;
-
   if(!code.toLowerCase().startsWith("<!doctype")){const idx=code.toLowerCase().indexOf("<html");if(idx>0)code=code.substring(idx);code="<!DOCTYPE html>\n"+code;}
   if(!code.toLowerCase().includes("<html")){code=`<!DOCTYPE html>\n<html lang="pt-BR">\n<head>\n<meta charset="UTF-8">\n<style>body{font-family:Arial,sans-serif;padding:20px}</style>\n</head>\n<body>\n${code}\n</body>\n</html>`;}
   if(isCodeCut(code)){const so=(code.match(/<script/gi)||[]).length,sc=(code.match(/<\/script>/gi)||[]).length;let fix=code;for(let i=0;i<so-sc;i++)fix+="\n}catch(e){}\n</script>";if(!fix.toLowerCase().includes("</body>"))fix+="\n</body>";if(!fix.toLowerCase().endsWith("</html>"))fix+="\n</html>";return fix;}
   return code;
 }
 
-// ── compilador Dinâmico para o Preview do Iframe ──────────────────────────────
 function buildPreviewCode(raw){
   if(!raw.includes("=== ARQUIVO:")) return raw;
-  
   const parts = raw.split(/===\s*ARQUIVO:\s*([\w\.\-]+)\s*===/i);
   const files = {};
   for (let i = 1; i < parts.length; i += 2) {
@@ -168,14 +145,11 @@ function buildPreviewCode(raw){
     const content = parts[i+1] ? parts[i+1].trim() : "";
     files[filename] = content;
   }
-  
   let html = files["index.html"] || "";
   if(!html){
     const firstKey = Object.keys(files)[0];
     html = files[firstKey] || raw;
   }
-  
-  // Injeta folha de estilo gerada
   if(files["style.css"]){
     if(html.toLowerCase().includes("</head>")){
       html = html.replace(/<\/head>/i, `<style>${files["style.css"]}</style>\n</head>`);
@@ -183,15 +157,12 @@ function buildPreviewCode(raw){
       html += `<style>${files["style.css"]}</style>`;
     }
   }
-  
-  // Compila e injeta todos os scripts JS gerados de forma sequencial
   let scripts = "";
   Object.keys(files).forEach(name => {
     if(name.endsWith(".js") && files[name]){
       scripts += `\n<script>\n// Módulo Emulado: ${name}\n${files[name]}\n<\/script>\n`;
     }
   });
-  
   if(scripts){
     if(html.toLowerCase().includes("</body>")){
       html = html.replace(/<\/body>/i, `${scripts}\n</body>`);
@@ -210,32 +181,30 @@ async function robustFetch(url,options){
   return data;
 }
 
-// ── Chamada da API Otimizada ──────────────────────────────────────────────────
-async function callAPI(promptText){
+// ── Chamada da API Adaptada para o Loop de Continuação ────────────────────────
+async function callAPI(promptText, isContinuation = false, previousCode = ""){
   const apiKey=document.getElementById("api-key").value.trim();
-
-  if(!apiKey){
-    throw new Error("API Key não informada.");
-  }
-  if(apiKey.length < 20){
-    throw new Error("API Key inválida.");
-  }
+  if(!apiKey) throw new Error("API Key não informada.");
+  if(apiKey.length < 20) throw new Error("API Key inválida.");
 
   const provider=document.getElementById("api-provider").value;
   const model=document.getElementById("model-select").value;
   const isGemini=provider==="gemini";
   const url=isGemini?`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`:"https://api.groq.com/openai/v1/chat/completions";
   
-  // [Problema 1] Remoção completa do limitador de tamanho de caracteres
-  const safePrompt = promptText;
-  
-  // [Problema 3] Estruturação agressiva anti-omissões do prompt do usuário
-  const userMsg = `
-ATENÇÃO:
-LEIA 100% DO PEDIDO.
-NÃO RESUMA.
-NÃO CRIE EXEMPLOS.
+  let userMsg = "";
 
+  if(isContinuation){
+    userMsg = `CONTINUE EXATAMENTE DE ONDE PAROU.
+NÃO REPITA NADA DO QUE JÁ FOI ESCRITO.
+NÃO FAÇA INTRODUÇÕES.
+
+ÚLTIMA SAÍDA:
+${previousCode.slice(-5000)}`;
+  } else {
+    userMsg = `ATENÇÃO:
+LEIA 100% DO PEDIDO.
+NÃO RESUMA. NÃO CRIE EXEMPLOS.
 NÃO ESCREVA EM HIPÓTESE ALGUMA FRASES COMO:
 "este é apenas um exemplo"
 "funcionalidade não implementada"
@@ -252,31 +221,32 @@ OBRIGATÓRIO:
 - Implementar toda a lógica de estado do sistema.
 - Entregar a aplicação 100% pronta para uso imediato.
 - Gerar milhares de linhas se o projeto demandar.
-- Continuar escrevendo até a última tag de fechamento do último arquivo.
 
 PEDIDO DO USUÁRIO:
-${safePrompt}
-`;
+${promptText}`;
+  }
 
-  // [Problema 2] Elevação drástica do max_tokens do Groq para 8192
+  // Substituição de max_tokens por max_completion_tokens
   const body=isGemini
     ?{contents:[{parts:[{text:SYSTEM_PROMPT+"\n\n"+userMsg}]}],generationConfig:{temperature:0.3,maxOutputTokens:65536}}
-    :{model,messages:[{role:"system",content:SYSTEM_PROMPT},{role:"user",content:userMsg}],max_tokens:8192,temperature:0.2};
+    :{model,messages:[{role:"system",content:SYSTEM_PROMPT},{role:"user",content:userMsg}],max_completion_tokens:8192,temperature:0.2};
   
   const headers={"Content-Type":"application/json"};
   if(!isGemini)headers["Authorization"]="Bearer "+apiKey;
   const data=await robustFetch(url,{method:"POST",headers,body:JSON.stringify(body),signal:abortController?.signal});
+  
   const raw=isGemini?data?.candidates?.[0]?.content?.parts?.[0]?.text||"":data?.choices?.[0]?.message?.content||"";
-  if(data?.choices?.[0]?.finish_reason==="length")addLog("⚠ Limite de tokens atingido — o código pode ter sido fracionado.");
-  const gr=data?.candidates?.[0]?.finishReason;
-  if(gr&&gr!=="STOP")addLog("⚠ Status Gemini: "+gr);
+  
+  // Padroniza a resposta para o Loop
+  const finishReason = isGemini ? data?.candidates?.[0]?.finishReason : data?.choices?.[0]?.finish_reason;
+  
   if(!raw||!raw.trim())throw new Error("A IA retornou uma resposta vazia.");
-  return cleanCode(raw);
+  
+  return { content: raw, finishReason: finishReason };
 }
 
 function showCode(code){
   const frame=document.getElementById("output-frame");
-  // Compila o ecossistema de arquivos para rodar de forma unificada no preview
   frame.srcdoc=buildPreviewCode(code);
   frame.style.display="block";
   document.getElementById("preview-empty").style.display="none";
@@ -286,58 +256,132 @@ function showCode(code){
   document.getElementById("download-btn").disabled=false;
   if(editMode)injectEditor();
 }
+
+// ── Loop de Geração Automática ────────────────────────────────────────────────
 async function gerarProjeto(){
   if(isGenerating)return;
   const prompt=document.getElementById("prompt").value.trim();
   const apiKey=document.getElementById("api-key").value.trim();
   if(!prompt||!apiKey){addLog("⚠ Preencha o prompt e a API Key");return;}
-  isGenerating=true;abortController=new AbortController();
+  
+  isGenerating=true;
+  abortController=new AbortController();
   const btn=document.getElementById("generate-btn"),stopBtn=document.getElementById("stop-btn");
-  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Construindo Fábrica...';stopBtn.classList.remove("hidden");
-  addLog("⏳ Analisando arquitetura e gerando arquivos do ecossistema...");
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner"></span> Construindo Fábrica...';
+  stopBtn.classList.remove("hidden");
+  
+  let fullCode = "";
+  let done = false;
+  let isContinuation = false;
+
+  addLog("⏳ Analisando arquitetura e iniciando geração...");
+
   try{
-    const code=await callAPI(prompt);
-    currentCode=code;currentProjectId=null;
-    showCode(code);saveCurrentProject();
-    addLog("✓ Projeto modular gerado com sucesso!");
+    while(!done){
+      if(abortController?.signal?.aborted){
+        throw new Error("abort");
+      }
+
+      const result = await callAPI(prompt, isContinuation, fullCode);
+      
+      // Limpa as tags de formatação soltas que a IA possa colocar na continuação
+      let newContent = result.content.replace(/```html\s*/gi,"").replace(/```javascript\s*/gi,"").replace(/```css\s*/gi,"").replace(/```\s*/g,"");
+      
+      fullCode += newContent;
+
+      // Verificações das APIs (Gemini retorna MAX_TOKENS, Groq retorna length)
+      if(result.finishReason === "length" || result.finishReason === "MAX_TOKENS"){
+        addLog("⏳ Limite de janela atingido. Injetando continuação automática...");
+        isContinuation = true;
+      } else {
+        done = true;
+      }
+    }
+
+    const finalCleanCode = cleanCode(fullCode);
+    currentCode=finalCleanCode;
+    currentProjectId=null;
+    showCode(finalCleanCode);
+    saveCurrentProject();
+    addLog("✓ Ecossistema massivo gerado com sucesso!");
+
   }catch(e){
     if(e.name==="AbortError"||e.message?.includes("abort"))addLog("✕ Processo interrompido.");
     else addLog("❌ Falha na Construção: "+e.message);
   }finally{
-    isGenerating=false;btn.disabled=false;btn.innerHTML='<span>✨</span> Gerar Projeto';stopBtn.classList.add("hidden");
+    isGenerating=false;
+    btn.disabled=false;
+    btn.innerHTML='<span>✨</span> Gerar Projeto';
+    stopBtn.classList.add("hidden");
   }
 }
+
 async function runImprovement(improvPrompt){
   if(!currentCode){addLog("⚠ Nenhum ecossistema ativo para aplicar melhorias.");return;}
   const apiKey=document.getElementById("api-key").value.trim();
   if(!apiKey){addLog("⚠ Configure a API Key");return;}
-  isGenerating=true;abortController=new AbortController();
-  const btns=document.querySelectorAll(".quick-btn,.btn-generate");btns.forEach(b=>b.disabled=true);
-  addLog("🪄 Redirecionando engenharia para aplicar melhorias...");
+  
+  isGenerating=true;
+  abortController=new AbortController();
+  const btns=document.querySelectorAll(".quick-btn,.btn-generate");
+  btns.forEach(b=>b.disabled=true);
+  addLog("🪄 Refatorando arquitetura...");
+  
+  let fullCode = "";
+  let done = false;
+  let isContinuation = false;
+
   try{
-    const fullPrompt=`MODO REFATORAÇÃO DE ESCOPO — REGRAS: Mantenha todos os módulos existentes intactos. Adicione/modifique estritamente o necessário dentro dos delimitadores de arquivo.\n\nMELHORIA ESPECÍFICA: ${improvPrompt}\n\nCÓDIGO DA ARQUITETURA ATUAL:\n${currentCode}`;
-    const improved=await callAPI(fullPrompt);
-    currentCode=improved;showCode(improved);saveCurrentProject();
+    while(!done){
+      if(abortController?.signal?.aborted) throw new Error("abort");
+
+      let promptToSend = "";
+      if(isContinuation){
+        promptToSend = "CONTINUE"; // callAPI já trata a continuação internamente
+      } else {
+        promptToSend = `MODO REFATORAÇÃO DE ESCOPO — REGRAS: Mantenha todos os módulos existentes intactos. Adicione/modifique estritamente o necessário.\nMELHORIA: ${improvPrompt}\nCÓDIGO ATUAL:\n${currentCode}`;
+      }
+
+      const result=await callAPI(promptToSend, isContinuation, fullCode);
+      let newContent = result.content.replace(/```html\s*/gi,"").replace(/```javascript\s*/gi,"").replace(/```css\s*/gi,"").replace(/```\s*/g,"");
+      fullCode += newContent;
+
+      if(result.finishReason === "length" || result.finishReason === "MAX_TOKENS"){
+        addLog("⏳ Refatoração longa. Continuando automaticamente...");
+        isContinuation = true;
+      } else {
+        done = true;
+      }
+    }
+    
+    const finalCleanCode = cleanCode(fullCode);
+    currentCode=finalCleanCode;
+    showCode(finalCleanCode);
+    saveCurrentProject();
     addLog("✅ Arquitetura atualizada e salva com sucesso!");
   }catch(e){
     if(e.name==="AbortError"||e.message?.includes("abort"))addLog("✕ Cancelado.");
     else addLog("❌ Erro na refatoração: "+e.message);
   }finally{
-    isGenerating=false;btns.forEach(b=>b.disabled=false);
+    isGenerating=false;
+    btns.forEach(b=>b.disabled=false);
   }
 }
+
 function runCustomImprovement(){
   const p=document.getElementById("improve-prompt").value.trim();
   if(!p){addLog("⚠ Descreva a melhoria");return;}
   runImprovement(p);document.getElementById("improve-prompt").value="";
 }
+
 function pararGeracao(){
   abortController?.abort();isGenerating=false;
   document.getElementById("generate-btn").disabled=false;
   document.getElementById("generate-btn").innerHTML='<span>✨</span> Gerar Projeto';
   document.getElementById("stop-btn").classList.add("hidden");
   document.querySelectorAll(".quick-btn").forEach(b=>b.disabled=false);
-  addLog("✕ Operação cancelada pelo usuário.");
+  addLog("✕ Operação cancelada manualmente.");
 }
 
 function switchTab(tab, btn){
@@ -355,7 +399,6 @@ function copyCode(){
   });
 }
 
-// Exportador inteligente adaptado para lidar com pacotes de arquivos estruturados
 async function downloadCode(){
   if(!currentCode) return;
   const isMulti = currentCode.includes("=== ARQUIVO:");
@@ -382,12 +425,13 @@ function configurarResponsivo(){
     });
   });
 }
+
 function toggleAI(){
   const body=document.getElementById("ai-body"),ch=document.getElementById("ai-chevron");
   const open=body.style.display==="none";
   body.style.display=open?"flex":"none";ch.textContent=open?"▲":"▼";
 }
-// ── Visual Editor ────────────────────────────────────────────────────────────
+
 function toggleEdit(){
   editMode=!editMode;
   const btn=document.getElementById("edit-btn"),badge=document.getElementById("edit-badge");
@@ -395,8 +439,9 @@ function toggleEdit(){
   btn.style.color=editMode?"var(--primary)":"var(--muted)";
   badge.style.display=editMode?"inline-flex":"none";
   if(editMode)injectEditor();else removeEditor();
-  addLog(editMode?"✏ Editor visual ativo — clique nos blocos de texto do preview para alterar":"✏ Editor visual desativado.");
+  addLog(editMode?"✏ Editor visual ativo":"✏ Editor visual desativado.");
 }
+
 function injectEditor(){
   const iframe=document.getElementById("output-frame");
   if(!iframe||!iframe.contentDocument)return;
@@ -421,6 +466,7 @@ function injectEditor(){
     node=walker.nextNode();
   }
 }
+
 function removeEditor(){
   const iframe=document.getElementById("output-frame");
   if(!iframe||!iframe.contentDocument)return;
