@@ -68,13 +68,51 @@ function newProject(){
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded",()=>{
-  atualizarModelos();configurarResponsivo();renderHistory();
+  
+  // [Melhoria 2] Carregar Provedor salvo antes de atualizar os modelos da lista
+  const savedProvider = localStorage.getItem("omega_provider");
+  if(savedProvider){
+    document.getElementById("api-provider").value = savedProvider;
+  }
+
+  atualizarModelos();
+  configurarResponsivo();
+  renderHistory();
+  
+  // [Melhoria 1] Carregar API Key salva
+  const savedKey = localStorage.getItem("omega_api_key");
+  if(savedKey){
+    document.getElementById("api-key").value = savedKey;
+  }
+
+  // [Melhoria 4] Carregar Prompt salvo
+  const promptField = document.getElementById("prompt");
+  promptField.value = localStorage.getItem("omega_prompt") || "";
+
+  // Ouvintes de Eventos para os botões principais
   document.getElementById("generate-btn").addEventListener("click",gerarProjeto);
   document.getElementById("stop-btn").addEventListener("click",pararGeracao);
-  document.getElementById("api-provider").addEventListener("change",atualizarModelos);
+  
+  // [Melhoria 2] Salvar Provedor automaticamente ao mudar e atualizar lista de modelos
+  document.getElementById("api-provider").addEventListener("change", e => {
+    localStorage.setItem("omega_provider", e.target.value);
+    atualizarModelos();
+  });
+
+  // [Melhoria 1] Salvar API Key automaticamente ao digitar
+  document.getElementById("api-key").addEventListener("input", e => {
+    localStorage.setItem("omega_api_key", e.target.value);
+  });
+
+  // [Melhoria 4] Salvar Prompt automaticamente ao digitar
+  promptField.addEventListener("input", () => {
+    localStorage.setItem("omega_prompt", promptField.value);
+  });
+
   document.getElementById("eye-btn").addEventListener("click",()=>{const i=document.getElementById("api-key");i.type=i.type==="password"?"text":"password";});
   document.getElementById("prompt").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))gerarProjeto();});
-  // Listen for visual editor changes from iframe
+  
+  // Escutar alterações do editor visual vindas do iframe
   window.addEventListener("message",e=>{
     if(e.data?.type==="omega_text_edit"&&e.data.html){
       currentCode="<!DOCTYPE html>\n"+e.data.html;
@@ -119,8 +157,18 @@ async function robustFetch(url,options){
   if(data?.error)throw new Error(data.error.message||JSON.stringify(data.error));
   return data;
 }
+
 async function callAPI(promptText){
   const apiKey=document.getElementById("api-key").value.trim();
+
+  // [Melhoria 6] Detector de Erros da API Key antes da requisição
+  if(!apiKey){
+    throw new Error("API Key não informada.");
+  }
+  if(apiKey.length < 20){
+    throw new Error("API Key inválida.");
+  }
+
   const provider=document.getElementById("api-provider").value;
   const model=document.getElementById("model-select").value;
   const isGemini=provider==="gemini";
@@ -202,11 +250,21 @@ function pararGeracao(){
   document.querySelectorAll(".quick-btn").forEach(b=>b.disabled=false);
   addLog("✕ Geração cancelada.");
 }
-function switchTab(tab,btn){
-  document.querySelectorAll(".tab-content").forEach(el=>el.classList.remove("active"));
-  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
-  document.getElementById("tab-"+tab).classList.add("active");btn.classList.add("active");
+
+// [Melhoria 5] Nova Função Corrigida de Troca de Aba
+function switchTab(tab, btn){
+  document.querySelectorAll(".tab-content").forEach(el=>{
+    el.classList.remove("active");
+  });
+  document.querySelectorAll(".tab-btn").forEach(el=>{
+    el.classList.remove("active");
+  });
+  document.getElementById(`tab-${tab}`).classList.add("active");
+  if(btn){
+    btn.classList.add("active");
+  }
 }
+
 function copyCode(){
   if(!currentCode)return;
   navigator.clipboard.writeText(currentCode).then(()=>{
@@ -214,13 +272,22 @@ function copyCode(){
     setTimeout(()=>btn.innerHTML="📋 Copiar",2000);
   });
 }
-function downloadCode(){
-  if(!currentCode)return;
-  const blob=new Blob([currentCode],{type:"text/html"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");a.href=url;a.download="projeto.html";a.click();
-  URL.revokeObjectURL(url);addLog("⬇ Projeto baixado.");
+
+// [Melhoria 3] Nova Função de Exportação Avançada para downloadCode()
+async function downloadCode(){
+  if(!currentCode) return;
+  const blob = new Blob([currentCode], {
+    type: "text/html"
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "index.html";
+  a.click();
+  URL.revokeObjectURL(url);
+  addLog("📦 Projeto exportado.");
 }
+
 function configurarResponsivo(){
   const labels={desktop:"100%",tablet:"768px",mobile:"375px"};
   document.querySelectorAll(".resp-btn").forEach(btn=>{
