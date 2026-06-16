@@ -1,54 +1,16 @@
-const GEMINI_MODELS=["gemini-2.5-flash"];
-const GROQ_MODELS = ["llama-3.3-70b-versatile","llama-3.1-8b-instant"];
+const GEMINI_MODELS=["gemini-2.5-flash","gemini-2.0-flash"];
+const GROQ_MODELS=["llama-3.3-70b-versatile","deepseek-r1-distill-llama-70b","llama3-70b-8192"];
 let isGenerating=false,abortController=null,currentCode="",editMode=false,currentProjectId=null;
 const STORAGE_KEY="omega_projects_v2";
 
-const SYSTEM_PROMPT=`OMEGA AUTO SOFTWARE FACTORY PRO MODE
-
-IDENTIDADE:
-Você é uma IA de engenharia de software profissional multi-especialista.
-
+const SYSTEM_PROMPT=`
+OMEGA AUTO SOFTWARE FACTORY PRO MODE
 MISSÃO: Transformar qualquer pedido em software REAL, COMPLETO, PROFISSIONAL e 100% FUNCIONAL.
-
-PROCESSO INTERNO OBRIGATÓRIO:
-Antes de responder, internamente:
-1. Analise o pedido completo
-2. Planeje a arquitetura ideal
-3. Escreva TODO o código antes de começar a gerar
-4. Verifique se nada está faltando
-5. Somente então gere a saída final
-
-REGRAS DE QUALIDADE:
-- Design premium e moderno
-- Totalmente responsivo
-- Animações suaves
-- Tudo funcional (botões, forms, navegação)
-- Código limpo e robusto
-- Use localStorage quando precisar persistir dados
-- NUNCA deixe função vazia ou incompleta
-
-REGRA DE COMPLETUDE - CRÍTICA:
-- Escreva TODAS as funções COMPLETAS, do início ao fim
-- NUNCA use comentários como "// resto aqui", "// continua...", "// implemente aqui"
-- NUNCA abrevie o código
-- Se o código for grande, use técnicas para deixá-lo compacto SEM remover funcionalidade
-
-PROIBIDO:
-- Código parcial ou funções vazias
-- Placeholders falsos
-- Botões sem ação
-- Links quebrados
-- Markdown, JSON ou texto extra
-- Blocos de código com crases
-- Comentários indicando código omitido
-
-FORMATO DE SAÍDA OBRIGATÓRIO:
-- APENAS código HTML completo, nada mais
-- Iniciar EXATAMENTE com <!DOCTYPE html>
-- CSS dentro de <style> no <head>
-- JavaScript dentro de <script> antes de </body>
-- NUNCA retornar CSS ou JS soltos fora do HTML
-- A última linha DEVE ser </html>
+PROCESSO: 1.Analise 2.Planeje 3.Escreva TUDO 4.Verifique 5.Gere
+REGRAS: Design premium, responsivo, animações, tudo funcional, localStorage para dados, NUNCA função vazia.
+COMPLETUDE: Escreva TODAS funções completas. NUNCA "// resto aqui". NUNCA abrevie.
+PROIBIDO: código parcial, placeholders, botões sem ação, markdown, crases, comentários de omissão.
+FORMATO: APENAS HTML completo. Iniciar com <!DOCTYPE html>. CSS em <style>. JS em <script>. Última linha </html>.
 `;
 
 // ── Storage ──────────────────────────────────────────────────────────────────
@@ -106,8 +68,6 @@ function newProject(){
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded",()=>{
-  
-  // [Melhoria 2] Carregar Provedor salvo antes de atualizar os modelos da lista
   const savedProvider = localStorage.getItem("omega_provider");
   if(savedProvider){
     document.getElementById("api-provider").value = savedProvider;
@@ -117,32 +77,26 @@ document.addEventListener("DOMContentLoaded",()=>{
   configurarResponsivo();
   renderHistory();
   
-  // [Melhoria 1] Carregar API Key salva
   const savedKey = localStorage.getItem("omega_api_key");
   if(savedKey){
     document.getElementById("api-key").value = savedKey;
   }
 
-  // [Melhoria 4] Carregar Prompt salvo
   const promptField = document.getElementById("prompt");
   promptField.value = localStorage.getItem("omega_prompt") || "";
 
-  // Ouvintes de Eventos para os botões principais
   document.getElementById("generate-btn").addEventListener("click",gerarProjeto);
   document.getElementById("stop-btn").addEventListener("click",pararGeracao);
   
-  // [Melhoria 2] Salvar Provedor automaticamente ao mudar e atualizar lista de modelos
   document.getElementById("api-provider").addEventListener("change", e => {
     localStorage.setItem("omega_provider", e.target.value);
     atualizarModelos();
   });
 
-  // [Melhoria 1] Salvar API Key automaticamente ao digitar
   document.getElementById("api-key").addEventListener("input", e => {
     localStorage.setItem("omega_api_key", e.target.value);
   });
 
-  // [Melhoria 4] Salvar Prompt automaticamente ao digitar
   promptField.addEventListener("input", () => {
     localStorage.setItem("omega_prompt", promptField.value);
   });
@@ -150,7 +104,6 @@ document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("eye-btn").addEventListener("click",()=>{const i=document.getElementById("api-key");i.type=i.type==="password"?"text":"password";});
   document.getElementById("prompt").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))gerarProjeto();});
   
-  // Escutar alterações do editor visual vindas do iframe
   window.addEventListener("message",e=>{
     if(e.data?.type==="omega_text_edit"&&e.data.html){
       currentCode="<!DOCTYPE html>\n"+e.data.html;
@@ -196,10 +149,21 @@ async function robustFetch(url,options){
   return data;
 }
 
+// ── [PARTE 1] Limitador de tamanho para o Provedor Groq ──────────────────────
+const GROQ_SAFE_LIMIT = 9000;
+function limitPromptSize(text){
+  if(!text) return "";
+  if(text.length <= GROQ_SAFE_LIMIT){
+    return text;
+  }
+  addLog("⚠ Prompt muito grande. Reduzindo automaticamente...");
+  return text.substring(0,GROQ_SAFE_LIMIT);
+}
+
+// ── Chamada da API Principal ──────────────────────────────────────────────────
 async function callAPI(promptText){
   const apiKey=document.getElementById("api-key").value.trim();
 
-  // [Melhoria 6] Detector de Erros da API Key antes da requisição
   if(!apiKey){
     throw new Error("API Key não informada.");
   }
@@ -211,10 +175,24 @@ async function callAPI(promptText){
   const model=document.getElementById("model-select").value;
   const isGemini=provider==="gemini";
   const url=isGemini?`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`:"https://api.groq.com/openai/v1/chat/completions";
-  const userMsg = `Gere um único arquivo HTML completo.Inicie com <!DOCTYPE html>.Inclua CSS em <style>.Inclua JavaScript em <script>.Não use markdown.Pedido:${promptText}`;
+  
+  // [PARTE 2] Validação do tamanho do Prompt e nova montagem da Mensagem do Usuário
+  const safePrompt = provider === "gemini" ? promptText : limitPromptSize(promptText);
+  
+  const userMsg = `
+Gere um único arquivo HTML completo.
+Inicie com <!DOCTYPE html>.
+Inclua CSS em <style>.
+Inclua JavaScript em <script>.
+Não use markdown.
+Pedido: ${safePrompt}
+`;
+
+  // Configuração do corpo da requisição (max_tokens alterado para 4096 no Groq)
   const body=isGemini
     ?{contents:[{parts:[{text:SYSTEM_PROMPT+"\n\n"+userMsg}]}],generationConfig:{temperature:0.3,maxOutputTokens:65536}}
-    :{model,messages:[{role:"system",content:SYSTEM_PROMPT},{role:"user",content:userMsg}],max_tokens: 8192,temperature:0.25};
+    :{model,messages:[{role:"system",content:SYSTEM_PROMPT},{role:"user",content:userMsg}],max_tokens:4096,temperature:0.25};
+  
   const headers={"Content-Type":"application/json"};
   if(!isGemini)headers["Authorization"]="Bearer "+apiKey;
   const data=await robustFetch(url,{method:"POST",headers,body:JSON.stringify(body),signal:abortController?.signal});
@@ -225,6 +203,7 @@ async function callAPI(promptText){
   if(!raw||!raw.trim())throw new Error("A IA retornou resposta vazia. Verifique sua API Key.");
   return cleanCode(raw);
 }
+
 function showCode(code){
   const frame=document.getElementById("output-frame");
   frame.srcdoc=code;frame.style.display="block";
@@ -289,7 +268,6 @@ function pararGeracao(){
   addLog("✕ Geração cancelada.");
 }
 
-// [Melhoria 5] Nova Função Corrigida de Troca de Aba
 function switchTab(tab, btn){
   document.querySelectorAll(".tab-content").forEach(el=>{
     el.classList.remove("active");
@@ -311,7 +289,6 @@ function copyCode(){
   });
 }
 
-// [Melhoria 3] Nova Função de Exportação Avançada para downloadCode()
 async function downloadCode(){
   if(!currentCode) return;
   const blob = new Blob([currentCode], {
