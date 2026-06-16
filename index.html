@@ -7,110 +7,102 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
 <header>
   <div class="logo">
     <div class="logo-icon">⚡</div>
-    <div class="logo-text">
-      <h1>Omega Factory</h1>
-      <p>Gerador de Software com IA</p>
-    </div>
+    <div class="logo-text"><h1>Omega Factory</h1><p>Gerador de Software com IA</p></div>
   </div>
-  <div class="status-dot">
-    <div class="dot"></div>
-    Online
-  </div>
+  <div class="status-dot"><div class="dot"></div>Online</div>
 </header>
-
 <div class="main">
-
   <aside class="sidebar">
-
     <div>
       <div class="section-label">⚙ Configuração</div>
       <div class="grid-2" style="margin-top:8px">
-        <div>
-          <label>Provedor</label>
-          <select id="api-provider">
-            <option value="gemini">Google Gemini</option>
-            <option value="groq">Groq</option>
-          </select>
-        </div>
-        <div>
-          <label>Modelo</label>
-          <select id="model-select"></select>
-        </div>
+        <div><label>Provedor</label><select id="api-provider"><option value="gemini">Google Gemini</option><option value="groq">Groq</option></select></div>
+        <div><label>Modelo</label><select id="model-select"></select></div>
       </div>
       <div style="margin-top:10px">
         <label>API Key</label>
         <div class="api-key-wrap">
-          <input type="password" id="api-key" placeholder="Cole sua API Key aqui..." />
-          <button class="eye-btn" id="eye-btn" title="Mostrar/ocultar">👁</button>
+          <input type="password" id="api-key" placeholder="Cole sua API Key aqui..."/>
+          <button class="eye-btn" id="eye-btn">👁</button>
         </div>
       </div>
     </div>
-
     <div class="divider"></div>
-
+    <div class="ai-panel">
+      <div class="ai-header" onclick="toggleAI()">
+        <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600">🪄 IA Assistente <span style="font-size:10px;color:var(--muted);font-weight:400">otimizar & evoluir</span></span>
+        <span id="ai-chevron" style="color:var(--muted);font-size:11px">▼</span>
+      </div>
+      <div class="ai-body" id="ai-body" style="display:none">
+        <div class="quick-grid">
+          <button class="quick-btn" onclick="runImprovement('Melhore o design visual: cores, tipografia, espaçamentos e animações. Mantenha todas as funcionalidades.')">🎨 Melhorar design</button>
+          <button class="quick-btn" onclick="runImprovement('Torne o layout totalmente responsivo para mobile, tablet e desktop. Não remova nenhuma funcionalidade.')">📱 Responsividade</button>
+          <button class="quick-btn" onclick="runImprovement('Analise o código, corrija todos os bugs, erros de lógica. Mantenha todas as funcionalidades.')">✅ Corrigir bugs</button>
+          <button class="quick-btn" onclick="runImprovement('Adicione dark mode com toggle. Mantenha todas as funcionalidades existentes.')">🌙 Dark mode</button>
+          <button class="quick-btn" onclick="runImprovement('Adicione localStorage para salvar todos os dados automaticamente. Mantenha todas as funcionalidades.')">💾 Persistência</button>
+          <button class="quick-btn" onclick="runImprovement('Otimize a performance, adicione loading states e micro-interações. Mantenha todas as funcionalidades.')">⚡ Performance</button>
+        </div>
+        <textarea id="improve-prompt" placeholder="Descreva uma melhoria específica..." style="min-height:60px;margin-top:4px"></textarea>
+        <button class="btn-generate" id="improve-btn" onclick="runCustomImprovement()" style="padding:8px">🪄 Aplicar Melhoria</button>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div>
+      <div class="section-label" style="justify-content:space-between">
+        <span>📁 Histórico</span>
+        <button onclick="newProject()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px" title="Novo projeto">＋</button>
+      </div>
+      <div class="history-list" id="history-list"></div>
+    </div>
+    <div class="divider"></div>
     <div style="display:flex;flex-direction:column;gap:10px;flex:1">
       <div class="section-label">✏ Prompt</div>
-      <textarea id="prompt" placeholder="Descreva o que você quer criar...
-
-Ex: Crie um app de lista de tarefas com design moderno, dark mode, drag & drop e localStorage..."></textarea>
-
+      <textarea id="prompt" placeholder="Descreva o que você quer criar..."></textarea>
       <div class="btn-row">
-        <button class="btn-generate" id="generate-btn">
-          <span>✨</span> Gerar Projeto
-        </button>
-        <button class="btn-stop hidden" id="stop-btn">
-          ⏹ Parar
-        </button>
+        <button class="btn-generate" id="generate-btn"><span>✨</span> Gerar Projeto</button>
+        <button class="btn-stop hidden" id="stop-btn">⏹ Parar</button>
       </div>
       <p class="hint">Ctrl+Enter para gerar</p>
     </div>
-
   </aside>
-
   <div class="panel">
-
-    <div class="tabs-bar">
-      <button class="tab-btn active" onclick="switchTab('preview', this)">👁 Prévia</button>
-      <button class="tab-btn" onclick="switchTab('code', this)">💻 Código</button>
+    <div class="tabs-bar" style="justify-content:space-between">
+      <div style="display:flex">
+        <button class="tab-btn active" onclick="switchTab('preview',this)">👁 Prévia</button>
+        <button class="tab-btn" onclick="switchTab('code',this)">💻 Código</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding-right:8px">
+        <button id="edit-btn" onclick="toggleEdit()" title="Editor visual — clique em textos para editar" style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:11px;padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .2s">✏ Editar Visual</button>
+        <span id="edit-badge" class="edit-badge" style="display:none">● editando</span>
+      </div>
     </div>
-
     <div class="content">
-
       <div class="tab-content active" id="tab-preview">
         <div class="preview-toolbar">
-          <div class="window-dots">
-            <span class="r"></span><span class="y"></span><span class="g"></span>
-          </div>
+          <div class="window-dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
           <div class="resp-btns">
-            <button class="resp-btn active" data-view="desktop" title="Desktop">🖥</button>
-            <button class="resp-btn" data-view="tablet" title="Tablet">📱</button>
-            <button class="resp-btn" data-view="mobile" title="Mobile">📲</button>
+            <button class="resp-btn active" data-view="desktop">🖥</button>
+            <button class="resp-btn" data-view="tablet">📱</button>
+            <button class="resp-btn" data-view="mobile">📲</button>
           </div>
           <span style="font-size:10px;color:var(--muted);font-family:var(--mono)" id="view-label">100%</span>
         </div>
         <div class="preview-area">
           <div class="iframe-wrapper view-desktop" id="iframe-wrapper">
-            <div class="preview-empty" id="preview-empty">
-              <div class="icon">🖥</div>
-              <p>A prévia aparecerá aqui</p>
-            </div>
-            <iframe id="output-frame" style="display:none"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-              title="Preview"></iframe>
+            <div class="preview-empty" id="preview-empty"><div class="icon">🖥</div><p>A prévia aparecerá aqui</p></div>
+            <iframe id="output-frame" style="display:none" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" title="Preview"></iframe>
           </div>
         </div>
       </div>
-
       <div class="tab-content" id="tab-code">
         <div class="code-toolbar">
           <span class="code-filename">index.html</span>
           <div class="code-actions">
-            <button class="icon-btn" id="copy-btn" onclick="copyCode()" disabled title="Copiar">📋 Copiar</button>
-            <button class="icon-btn" id="download-btn" onclick="downloadCode()" disabled title="Baixar">⬇ Baixar</button>
+            <button class="icon-btn" id="copy-btn" onclick="copyCode()" disabled>📋 Copiar</button>
+            <button class="icon-btn" id="download-btn" onclick="downloadCode()" disabled>⬇ Baixar Projeto</button>
           </div>
         </div>
         <div class="code-area">
@@ -118,17 +110,13 @@ Ex: Crie um app de lista de tarefas com design moderno, dark mode, drag & drop e
           <pre id="code-output" style="display:none"></pre>
         </div>
       </div>
-
     </div>
-
     <div class="log-bar">
       <div class="log-header">⬛ Log</div>
       <div id="status-log"></div>
     </div>
-
   </div>
 </div>
-
 <script src="script.js"></script>
 </body>
 </html>
