@@ -1,4 +1,4 @@
-const GEMINI_MODELS=["gemini-2.5-flash","gemini-2.0-flash"];
+const GEMINI_MODELS=["gemini-2.5-flash","gemini-2.5-pro"];
 const GROQ_MODELS=["llama-3.3-70b-versatile","deepseek-r1-distill-llama-70b","llama3-70b-8192"];
 let isGenerating=false,abortController=null,currentCode="",editMode=false,currentProjectId=null;
 const STORAGE_KEY="omega_projects_v2";
@@ -173,10 +173,15 @@ function newProject(){
 document.addEventListener("DOMContentLoaded",()=>{
   
   // [Melhoria 2] Carregar Provedor salvo antes de atualizar os modelos da lista
-  const savedProvider = localStorage.getItem("omega_provider");
-  if(savedProvider){
-    document.getElementById("api-provider").value = savedProvider;
-  }
+  const savedModel = localStorage.getItem("omega_model");
+if(savedModel){
+  document.getElementById("model-select").value = savedModel;
+}
+
+document.getElementById("model-select")
+.addEventListener("change",e=>{
+  localStorage.setItem("omega_model",e.target.value);
+});
 
   atualizarModelos();
   configurarResponsivo();
@@ -218,7 +223,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   // Escutar alterações do editor visual vindas do iframe
   window.addEventListener("message",e=>{
     if(e.data?.type==="omega_text_edit"&&e.data.html){
-      currentCode="<!DOCTYPE html>\n"+e.data.html;
+     currentCode=e.data.html.includes("<!DOCTYPE html>")? e.data.html: "<!DOCTYPE html>\n"+e.data.html;
       document.getElementById("code-output").textContent=currentCode;
       saveCurrentProject();
     }
@@ -267,10 +272,10 @@ async function callAPI(promptText){
   // [Melhoria 6] Detector de Erros da API Key antes da requisição
   if(!apiKey){
     throw new Error("API Key não informada.");
-  }
-  if(apiKey.length < 20){
-    throw new Error("API Key inválida.");
-  }
+ 
+    if(apiKey.length < 10){
+  throw new Error("API Key inválida.");
+}
 
   const provider=document.getElementById("api-provider").value;
   const model=document.getElementById("model-select").value;
@@ -278,7 +283,7 @@ async function callAPI(promptText){
   const url=isGemini?`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`:"https://api.groq.com/openai/v1/chat/completions";
   const userMsg=`INSTRUÇÕES CRÍTICAS: RESPONDA APENAS COM HTML COMPLETO. COMEÇAR COM <!DOCTYPE html>. CSS em <style>. JS em <script>. ÚLTIMA LINHA </html>. PROIBIDO abreviar.\n\n${promptText}`;
   const body=isGemini
-    ?{contents:[{parts:[{text:SYSTEM_PROMPT+"\n\n"+userMsg}]}],generationConfig:{temperature:0.3,maxOutputTokens:65536}}
+    ?{contents:[{parts:[{text:SYSTEM_PROMPT+"\n\n"+userMsg}]}],generationConfig:{temperature:0.3,maxOutputTokens:32768}}
     :{model,messages:[{role:"system",content:SYSTEM_PROMPT},{role:"user",content:userMsg}],max_tokens:32768,temperature:0.25};
   const headers={"Content-Type":"application/json"};
   if(!isGemini)headers["Authorization"]="Bearer "+apiKey;
@@ -290,7 +295,7 @@ async function callAPI(promptText){
   if(!raw||!raw.trim())throw new Error("A IA retornou resposta vazia. Verifique sua API Key.");
   return cleanCode(raw);
 }
-function showCode(code){
+function saveCurrentProject();
   const frame=document.getElementById("output-frame");
   frame.srcdoc=code;frame.style.display="block";
   document.getElementById("preview-empty").style.display="none";
