@@ -1,120 +1,55 @@
-const GEMINI_MODELS=["gemini-2.5-flash","gemini-2.5-pro"];
+const GEMINI_MODELS=["gemini-2.5-flash"];
 const GROQ_MODELS=["llama-3.3-70b-versatile","deepseek-r1-distill-llama-70b","llama3-70b-8192"];
 let isGenerating=false,abortController=null,currentCode="",editMode=false,currentProjectId=null;
 const STORAGE_KEY="omega_projects_v2";
 
-const SYSTEM_PROMPT=`
-OMEGA AUTO SOFTWARE FACTORY PRO MODE
+const SYSTEM_PROMPT=`OMEGA AUTO SOFTWARE FACTORY PRO MODE
 
-MISSÃO:
-Transformar qualquer pedido em software REAL, COMPLETO, PROFISSIONAL, ESCALÁVEL e 100% FUNCIONAL.
+IDENTIDADE:
+Você é uma IA de engenharia de software profissional multi-especialista.
 
-PROCESSO:
+MISSÃO: Transformar qualquer pedido em software REAL, COMPLETO, PROFISSIONAL e 100% FUNCIONAL.
 
-1. Analisar profundamente o pedido.
-2. Planejar a arquitetura do aplicativo.
-3. Planejar telas, componentes e fluxos.
-4. Implementar todas as funcionalidades.
-5. Validar todas as interações.
-6. Corrigir possíveis erros.
-7. Entregar o sistema completo.
+PROCESSO INTERNO OBRIGATÓRIO:
+Antes de responder, internamente:
+1. Analise o pedido completo
+2. Planeje a arquitetura ideal
+3. Escreva TODO o código antes de começar a gerar
+4. Verifique se nada está faltando
+5. Somente então gere a saída final
 
-REGRAS:
+REGRAS DE QUALIDADE:
+- Design premium e moderno
+- Totalmente responsivo
+- Animações suaves
+- Tudo funcional (botões, forms, navegação)
+- Código limpo e robusto
+- Use localStorage quando precisar persistir dados
+- NUNCA deixe função vazia ou incompleta
 
-* Design premium e moderno.
-* Interface profissional nível SaaS.
-* Responsivo para mobile, tablet e desktop.
-* UX e UI de alta qualidade.
-* Animações suaves e modernas.
-* Todos os botões funcionais.
-* Todos os formulários funcionais.
-* Todos os menus funcionais.
-* Todos os links funcionais.
-* LocalStorage quando necessário.
-* Tratamento de erros.
-* Validações completas.
-* Loading states.
-* Feedback visual para ações do usuário.
-* NUNCA criar funções vazias.
-* NUNCA gerar recursos falsos.
-* NUNCA deixar elementos sem funcionamento.
-
-QUALIDADE NÍVEL APP BUILDER:
-
-* Pensar como arquiteto de software sênior.
-* Pensar como desenvolvedor full stack.
-* Criar aplicativos completos e utilizáveis.
-* Criar dashboards quando apropriado.
-* Criar CRUD completo quando necessário.
-* Criar sistemas administrativos quando necessário.
-* Criar filtros e pesquisas quando necessário.
-* Criar modais funcionais.
-* Criar notificações.
-* Criar componentes reutilizáveis.
-* Criar experiência semelhante a software real.
-* Priorizar produtividade e experiência do usuário.
-* Nunca gerar apenas landing page quando o pedido for um aplicativo.
-
-COMPLETUDE:
-
-* Escrever TODAS as funções completas.
-* Escrever TODO o HTML.
-* Escrever TODO o CSS.
-* Escrever TODO o JavaScript.
-* NUNCA usar "// resto aqui".
-* NUNCA usar "// continue".
-* NUNCA resumir código.
-* NUNCA abreviar implementação.
-* NUNCA omitir partes importantes.
-
-VERIFICAÇÃO FINAL:
-Antes de responder:
-
-* Verificar HTML.
-* Verificar CSS.
-* Verificar JavaScript.
-* Verificar responsividade.
-* Verificar formulários.
-* Verificar botões.
-* Verificar menus.
-* Verificar eventos.
-* Corrigir automaticamente qualquer erro encontrado.
-
-MODO APP BUILDER PROFISSIONAL:
-
-Antes de escrever qualquer código:
-
-1. Entender o objetivo do aplicativo.
-2. Planejar todas as telas.
-3. Planejar componentes.
-4. Planejar armazenamento de dados.
-5. Planejar fluxos do usuário.
-6. Planejar validações.
-7. Planejar responsividade.
-8. Somente depois gerar o código completo.
-
-A resposta deve parecer um software criado por uma equipe profissional e não um exemplo ou protótipo.
+REGRA DE COMPLETUDE - CRÍTICA:
+- Escreva TODAS as funções COMPLETAS, do início ao fim
+- NUNCA use comentários como "// resto aqui", "// continua...", "// implemente aqui"
+- NUNCA abrevie o código
+- Se o código for grande, use técnicas para deixá-lo compacto SEM remover funcionalidade
 
 PROIBIDO:
+- Código parcial ou funções vazias
+- Placeholders falsos
+- Botões sem ação
+- Links quebrados
+- Markdown, JSON ou texto extra
+- Blocos de código com crases
+- Comentários indicando código omitido
 
-* Código parcial.
-* Placeholders.
-* Botões sem ação.
-* Markdown.
-* Crases.
-* Explicações fora do código.
-* Comentários de omissão.
-* Funções vazias.
-* Recursos simulados.
-
-FORMATO:
-APENAS HTML completo.
-Iniciar obrigatoriamente com <!DOCTYPE html>.
-CSS dentro de <style>.
-JavaScript dentro de <script>.
-Última linha obrigatoriamente </html>.
+FORMATO DE SAÍDA OBRIGATÓRIO:
+- APENAS código HTML completo, nada mais
+- Iniciar EXATAMENTE com <!DOCTYPE html>
+- CSS dentro de <style> no <head>
+- JavaScript dentro de <script> antes de </body>
+- NUNCA retornar CSS ou JS soltos fora do HTML
+- A última linha DEVE ser </html>
 `;
-
 
 // ── Storage ──────────────────────────────────────────────────────────────────
 function getProjects(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]")}catch{return[]}}
@@ -173,15 +108,10 @@ function newProject(){
 document.addEventListener("DOMContentLoaded",()=>{
   
   // [Melhoria 2] Carregar Provedor salvo antes de atualizar os modelos da lista
-  const savedModel = localStorage.getItem("omega_model");
-if(savedModel){
-  document.getElementById("model-select").value = savedModel;
-}
-
-document.getElementById("model-select")
-.addEventListener("change",e=>{
-  localStorage.setItem("omega_model",e.target.value);
-});
+  const savedProvider = localStorage.getItem("omega_provider");
+  if(savedProvider){
+    document.getElementById("api-provider").value = savedProvider;
+  }
 
   atualizarModelos();
   configurarResponsivo();
@@ -223,7 +153,7 @@ document.getElementById("model-select")
   // Escutar alterações do editor visual vindas do iframe
   window.addEventListener("message",e=>{
     if(e.data?.type==="omega_text_edit"&&e.data.html){
-     currentCode=e.data.html.includes("<!DOCTYPE html>")? e.data.html: "<!DOCTYPE html>\n"+e.data.html;
+      currentCode="<!DOCTYPE html>\n"+e.data.html;
       document.getElementById("code-output").textContent=currentCode;
       saveCurrentProject();
     }
@@ -272,10 +202,10 @@ async function callAPI(promptText){
   // [Melhoria 6] Detector de Erros da API Key antes da requisição
   if(!apiKey){
     throw new Error("API Key não informada.");
- 
-    if(apiKey.length < 10){
-  throw new Error("API Key inválida.");
-}
+  }
+  if(apiKey.length < 20){
+    throw new Error("API Key inválida.");
+  }
 
   const provider=document.getElementById("api-provider").value;
   const model=document.getElementById("model-select").value;
@@ -283,7 +213,7 @@ async function callAPI(promptText){
   const url=isGemini?`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`:"https://api.groq.com/openai/v1/chat/completions";
   const userMsg=`INSTRUÇÕES CRÍTICAS: RESPONDA APENAS COM HTML COMPLETO. COMEÇAR COM <!DOCTYPE html>. CSS em <style>. JS em <script>. ÚLTIMA LINHA </html>. PROIBIDO abreviar.\n\n${promptText}`;
   const body=isGemini
-    ?{contents:[{parts:[{text:SYSTEM_PROMPT+"\n\n"+userMsg}]}],generationConfig:{temperature:0.3,maxOutputTokens:32768}}
+    ?{contents:[{parts:[{text:SYSTEM_PROMPT+"\n\n"+userMsg}]}],generationConfig:{temperature:0.3,maxOutputTokens:65536}}
     :{model,messages:[{role:"system",content:SYSTEM_PROMPT},{role:"user",content:userMsg}],max_tokens:32768,temperature:0.25};
   const headers={"Content-Type":"application/json"};
   if(!isGemini)headers["Authorization"]="Bearer "+apiKey;
@@ -295,7 +225,7 @@ async function callAPI(promptText){
   if(!raw||!raw.trim())throw new Error("A IA retornou resposta vazia. Verifique sua API Key.");
   return cleanCode(raw);
 }
-function saveCurrentProject();
+function showCode(code){
   const frame=document.getElementById("output-frame");
   frame.srcdoc=code;frame.style.display="block";
   document.getElementById("preview-empty").style.display="none";
