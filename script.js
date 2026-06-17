@@ -9,7 +9,7 @@ import { saveVersionSnapshot } from "./storage/version-control.js";
 
 const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"];
 const GROQ_MODELS = ["llama-3.3-70b-versatile", "deepseek-r1-distill-llama-70b"];
-const STORAGE_KEY = "omega_projects_v2";
+const STORAGE_KEY = "jesus_reina_projects_v2";
 
 const state = {
   isGenerating: false,
@@ -27,7 +27,7 @@ window.runImprovement = runImprovement;
 window.newProject = newProject;
 window.loadProject = loadProject;
 window.delProject = delProject;
-window.omegaEditModeActive = false;
+window.jesusReinaEditModeActive = false;
 
 document.addEventListener("DOMContentLoaded", () => {
   atualizarModelos();
@@ -89,7 +89,7 @@ async function gerarProjeto() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Compilando...';
   stopBtn.classList.remove("hidden");
-  addLog("⏳ Conectando à malha de IA da Omega Factory...");
+  addLog("⏳ Conectando à malha de IA do Jesus Reina AI Studio...");
 
   try {
     const rawOutput = await callAI({
@@ -125,7 +125,7 @@ async function gerarProjeto() {
 }
 
 async function runImprovement(improvementPrompt) {
-  if (Object.keys(state.currentFiles).length === 0) {
+  if (Object.keys(state.currentFiles || {}).length === 0) {
     addLog("⚠ Nenhum projeto carregado no VFS para evolução.");
     return;
   }
@@ -178,7 +178,7 @@ function renderVirtualFiles() {
   const codeOutput = document.getElementById("code-output");
   const emptyCode = document.getElementById("code-empty");
 
-  if (!iframe || Object.keys(state.currentFiles).length === 0) return;
+  if (!iframe || Object.keys(state.currentFiles || {}).length === 0) return;
 
   const executionBlob = compileToSingleBlob(state.currentFiles);
   iframe.srcdoc = executionBlob;
@@ -186,7 +186,7 @@ function renderVirtualFiles() {
   emptyPreview.style.display = "none";
 
   let codeViewerBuffer = "";
-  for (const [filename, content] of Object.entries(state.currentFiles)) {
+  for (const [filename, content] of Object.entries(state.currentFiles || {})) {
     codeViewerBuffer += `// 📄 FILE: ${filename}\n${content}\n\n`;
   }
 
@@ -202,13 +202,17 @@ function renderVirtualFiles() {
       state.currentFiles["index.html"] = updatedHTML;
       saveToStorage(document.getElementById("prompt").value);
     });
+
+    if (window.jesusReinaEditModeActive) {
+      injectEditModeStyles(iframe);
+    }
   };
 }
 
 function exportarProjetoCompleto() {
   const pwaVFS = injectPWAFiles(state.currentFiles, state.projectName);
   downloadProjectAsZip(pwaVFS, state.projectName);
-  addLog("⬇ Pacote de distribuição estruturado .zip baixado.");
+  addLog("⬇ Pacote de distribuição estruturado PWA/ZIP baixado.");
 }
 
 function pararGeracao() {
@@ -217,18 +221,48 @@ function pararGeracao() {
 }
 
 function toggleEdit() {
-  window.omegaEditModeActive = !window.omegaEditModeActive;
+  window.jesusReinaEditModeActive = !window.jesusReinaEditModeActive;
   const btn = document.getElementById("edit-btn");
   const badge = document.getElementById("edit-badge");
+  const iframe = document.getElementById("output-frame");
   
-  btn.style.borderColor = window.omegaEditModeActive ? "var(--primary)" : "var(--border)";
-  btn.style.color = window.omegaEditModeActive ? "var(--primary)" : "var(--muted)";
-  badge.style.display = window.omegaEditModeActive ? "inline-flex" : "none";
+  btn.style.borderColor = window.jesusReinaEditModeActive ? "var(--primary)" : "var(--border)";
+  btn.style.color = window.jesusReinaEditModeActive ? "var(--primary)" : "var(--muted)";
+  badge.style.display = window.jesusReinaEditModeActive ? "inline-flex" : "none";
   
-  if (!window.omegaEditModeActive) {
+  if (!window.jesusReinaEditModeActive) {
     document.getElementById("style-inspector-panel").style.display = "none";
+    if(iframe && iframe.contentDocument) {
+      const injectedStyle = iframe.contentDocument.getElementById('jesus-reina-edit-mode-style');
+      if(injectedStyle) injectedStyle.remove();
+    }
+  } else {
+    if (iframe) injectEditModeStyles(iframe);
   }
-  addLog(window.omegaEditModeActive ? "✏ Modo Edição Ativado — Clique em qualquer elemento para abrir o painel de propriedades." : "✏ Modo Edição Desativado.");
+  
+  addLog(window.jesusReinaEditModeActive ? "✏ Modo Edição Ativado — Clique em qualquer elemento para interagir." : "✏ Modo Edição Desativado.");
+}
+
+function injectEditModeStyles(iframe) {
+  if (!iframe || !iframe.contentDocument) return;
+  const doc = iframe.contentDocument;
+  
+  if (doc.getElementById('jesus-reina-edit-mode-style')) return;
+
+  const style = doc.createElement('style');
+  style.id = 'jesus-reina-edit-mode-style';
+  style.innerHTML = `
+    *:hover {
+      outline: 2px solid rgba(0, 255, 255, 0.8) !important;
+      outline-offset: -2px !important;
+      box-shadow: 0 0 10px rgba(0, 255, 255, 0.5), inset 0 0 15px rgba(255, 255, 0, 0.2) !important;
+      background: rgba(255, 255, 255, 0.05) !important;
+      backdrop-filter: blur(4px) !important;
+      cursor: crosshair !important;
+      transition: all 0.2s ease-in-out;
+    }
+  `;
+  doc.head.appendChild(style);
 }
 
 function switchTab(tab, btn) {
