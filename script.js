@@ -1,280 +1,343 @@
-const GEMINI_MODELS=["gemini-2.5-flash","gemini-2.0-flash"];
-const GROQ_MODELS=["llama-3.3-70b-versatile","deepseek-r1-distill-llama-70b","llama3-70b-8192"];
-let isGenerating=false,abortController=null,currentCode="",editMode=false,currentProjectId=null;
-const STORAGE_KEY="omega_projects_v2";
+import { callAI } from "./core/ai-engine.js";
+import { extractFiles, compileToSingleBlob } from "./core/parser.js";
+import { repairCode } from "./core/repair-engine.js";
+import { initializeFullscreenController } from "./preview/fullscreen.js";
+import { initStyleEditor } from "./editor/style-editor.js";
+import { downloadProjectAsZip } from "./export/zip-export.js";
+import { injectPWAFiles } from "./export/pwa-export.js";
+import { saveVersionSnapshot } from "./storage/version-control.js";
 
-const SYSTEM_PROMPT=`
-OMEGA AUTO SOFTWARE FACTORY — MODO PROFISSIONAL AVANÇADO
+const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"];
+const GROQ_MODELS = ["llama-3.3-70b-versatile", "deepseek-r1-distill-llama-70b"];
+const STORAGE_KEY = "omega_projects_v2";
 
-IDENTIDADE: IA de engenharia de software sênior. Pensa como engenheiro da Apple + arquiteto full-stack.
+const state = {
+  isGenerating: false,
+  abortController: null,
+  currentFiles: {}, 
+  currentProjectId: null,
+  projectName: "Projeto Sem Nome"
+};
 
-MISSÃO: Criar software REAL, COMPLETO, BONITO e 100% FUNCIONAL que impressione ao abrir.
+window.switchTab = switchTab;
+window.toggleEdit = toggleEdit;
+window.toggleAI = toggleAI;
+window.runCustomImprovement = runCustomImprovement;
+window.runImprovement = runImprovement;
+window.newProject = newProject;
+window.loadProject = loadProject;
+window.delProject = delProject;
+window.omegaEditModeActive = false;
 
-CAPACIDADES: web apps multi-view, dashboards com Chart.js CDN, games canvas, lojas, SaaS, CRMs, redes sociais.
+document.addEventListener("DOMContentLoaded", () => {
+  atualizarModelos();
+  renderHistory();
+  initializeFullscreenController();
+  
+  document.getElementById("generate-btn").addEventListener("click", gerarProjeto);
+  document.getElementById("stop-btn").addEventListener("click", pararGeracao);
+  document.getElementById("api-provider").addEventListener("change", atualizarModelos);
+  document.getElementById("download-btn").addEventListener("click", exportarProjetoCompleto);
+  
+  document.getElementById("eye-btn").addEventListener("click", () => {
+    const i = document.getElementById("api-key");
+    i.type = i.type === "password" ? "text" : "password";
+  });
+  
+  document.getElementById("prompt").addEventListener("keydown", e => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) gerarProjeto();
+  });
 
-PROCESSO OBRIGATÓRIO: 1.Analise profundamente 2.Defina arquitetura e design system 3.Planeje interações e animações 4.Escreva TODO código mentalmente 5.Gere saída final completa.
+  configurarResponsivo();
+});
 
-PADRÕES: Design system com variáveis CSS, Google Fonts, responsivo Grid/Flex, animações, dark mode, localStorage, micro-interações, acessibilidade básica, roteamento por hash para multi-tela.
-
-CDN PERMITIDOS: Chart.js(cdn.jsdelivr.net/npm/chart.js), Sortable.js, Marked.js, DayJS.
-
-COMPLETUDE ABSOLUTA: 100% das funções completas. ZERO "// resto aqui", "// TODO". Cada botão funciona. Cada form valida. Cada lista tem empty state.
-
-PROIBIDO: código parcial, placeholder Lorem ipsum, botão sem ação, markdown, crases, comentários de omissão, design genérico sem personalidade.
-
-FORMATO SAGRADO: APENAS HTML. Primeira linha: <!DOCTYPE html>. CSS em <style>. JS em <script>. Última linha: </html>. NADA antes ou depois.
-`;
-
-// ── Storage ──────────────────────────────────────────────────────────────────
-function getProjects(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]")}catch{return[]}}
-function saveProjects(ps){localStorage.setItem(STORAGE_KEY,JSON.stringify(ps))}
-function saveCurrentProject(){
-  if(!currentCode)return;
-  const ps=getProjects();
-  const name=document.getElementById("prompt").value.trim().slice(0,40)||"Projeto sem nome";
-  if(currentProjectId){
-    const idx=ps.findIndex(p=>p.id===currentProjectId);
-    if(idx>=0){ps[idx]={...ps[idx],code:currentCode,prompt:document.getElementById("prompt").value,updatedAt:Date.now()};saveProjects(ps);renderHistory();return;}
-  }
-  const p={id:Date.now().toString(),name,prompt:document.getElementById("prompt").value,code:currentCode,createdAt:Date.now(),updatedAt:Date.now()};
-  ps.unshift(p);saveProjects(ps);currentProjectId=p.id;renderHistory();
+function atualizarModelos() {
+  const provider = document.getElementById("api-provider").value;
+  const select = document.getElementById("model-select");
+  const models = provider === "gemini" ? GEMINI_MODELS : GROQ_MODELS;
+  select.innerHTML = models.map(x => `<option value="${x}">${x}</option>`).join("");
 }
-function renderHistory(){
-  const ps=getProjects();
-  const el=document.getElementById("history-list");
-  if(!ps.length){el.innerHTML='<p style="font-size:11px;color:var(--muted);padding:8px;text-align:center;font-style:italic">Nenhum projeto salvo</p>';return;}
-  el.innerHTML=ps.map(p=>`
+
+function addLog(txt) {
+  const log = document.getElementById("status-log");
+  if (!log) return;
+  const p = document.createElement("p");
+  p.textContent = `${new Date().toLocaleTimeString()} — ${txt}`;
+  log.appendChild(p);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function gerarProjeto() {
+  if (state.isGenerating) return;
+  
+  const prompt = document.getElementById("prompt").value.trim();
+  const apiKey = document.getElementById("api-key").value.trim();
+  const provider = document.getElementById("api-provider").value;
+  const model = document.getElementById("model-select").value;
+
+  if (!prompt || !apiKey) {
+    addLog("⚠ Preencha o prompt de engenharia e insira a API Key para autenticação.");
+    return;
+  }
+
+  state.isGenerating = true;
+  state.abortController = new AbortController();
+  state.projectName = prompt.slice(0, 30) || "App Gerado";
+
+  const btn = document.getElementById("generate-btn");
+  const stopBtn = document.getElementById("stop-btn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Compilando...';
+  stopBtn.classList.remove("hidden");
+  addLog("⏳ Conectando à malha de IA da Omega Factory...");
+
+  try {
+    const rawOutput = await callAI({
+      promptText: prompt,
+      apiKey,
+      provider,
+      model,
+      currentFiles: null, 
+      signal: state.abortController.signal
+    });
+
+    let parsedFiles = extractFiles(rawOutput);
+    for (const file in parsedFiles) {
+      parsedFiles[file] = repairCode(parsedFiles[file]);
+    }
+
+    state.currentFiles = parsedFiles;
+    state.currentProjectId = Date.now().toString();
+    
+    renderVirtualFiles();
+    saveToStorage(prompt);
+    addLog("✓ Projeto multi-arquivos gerado e encapsulado com sucesso!");
+
+  } catch (error) {
+    if (error.name === "AbortError") addLog("✕ Geração interrompida pelo usuário.");
+    else addLog(`❌ Erro crítico: ${error.message}`);
+  } finally {
+    state.isGenerating = false;
+    btn.disabled = false;
+    btn.innerHTML = '<span>✨</span> Gerar Projeto';
+    stopBtn.classList.add("hidden");
+  }
+}
+
+async function runImprovement(improvementPrompt) {
+  if (Object.keys(state.currentFiles).length === 0) {
+    addLog("⚠ Nenhum projeto carregado no VFS para evolução.");
+    return;
+  }
+
+  const apiKey = document.getElementById("api-key").value.trim();
+  const provider = document.getElementById("api-provider").value;
+  const model = document.getElementById("model-select").value;
+
+  if (!apiKey) {
+    addLog("⚠ Configure sua chave de API antes de solicitar evoluções.");
+    return;
+  }
+
+  state.isGenerating = true;
+  state.abortController = new AbortController();
+  addLog("🪄 IA Assistente analisando árvore de arquivos atual para refatoração...");
+
+  try {
+    const rawOutput = await callAI({
+      promptText: improvementPrompt,
+      apiKey,
+      provider,
+      model,
+      currentFiles: state.currentFiles, 
+      signal: state.abortController.signal
+    });
+
+    let evolvedFiles = extractFiles(rawOutput);
+    for (const file in evolvedFiles) {
+      evolvedFiles[file] = repairCode(evolvedFiles[file]);
+    }
+
+    state.currentFiles = { ...state.currentFiles, ...evolvedFiles };
+    
+    saveVersionSnapshot(state.currentProjectId, state.currentFiles);
+    renderVirtualFiles();
+    saveToStorage(document.getElementById("prompt").value);
+    addLog("✅ Atualização incremental aplicada sem quebras!");
+
+  } catch (error) {
+    addLog(`❌ Falha no refinamento: ${error.message}`);
+  } finally {
+    state.isGenerating = false;
+  }
+}
+
+function renderVirtualFiles() {
+  const iframe = document.getElementById("output-frame");
+  const emptyPreview = document.getElementById("preview-empty");
+  const codeOutput = document.getElementById("code-output");
+  const emptyCode = document.getElementById("code-empty");
+
+  if (!iframe || Object.keys(state.currentFiles).length === 0) return;
+
+  const executionBlob = compileToSingleBlob(state.currentFiles);
+  iframe.srcdoc = executionBlob;
+  iframe.style.display = "block";
+  emptyPreview.style.display = "none";
+
+  let codeViewerBuffer = "";
+  for (const [filename, content] of Object.entries(state.currentFiles)) {
+    codeViewerBuffer += `// 📄 FILE: ${filename}\n${content}\n\n`;
+  }
+
+  codeOutput.textContent = codeViewerBuffer;
+  codeOutput.style.display = "block";
+  emptyCode.style.display = "none";
+
+  document.getElementById("download-btn").disabled = false;
+  document.getElementById("copy-btn").disabled = false;
+
+  iframe.onload = () => {
+    initStyleEditor(iframe, (updatedHTML) => {
+      state.currentFiles["index.html"] = updatedHTML;
+      saveToStorage(document.getElementById("prompt").value);
+    });
+  };
+}
+
+function exportarProjetoCompleto() {
+  const pwaVFS = injectPWAFiles(state.currentFiles, state.projectName);
+  downloadProjectAsZip(pwaVFS, state.projectName);
+  addLog("⬇ Pacote de distribuição estruturado .zip baixado.");
+}
+
+function pararGeracao() {
+  if (state.abortController) state.abortController.abort();
+  state.isGenerating = false;
+}
+
+function toggleEdit() {
+  window.omegaEditModeActive = !window.omegaEditModeActive;
+  const btn = document.getElementById("edit-btn");
+  const badge = document.getElementById("edit-badge");
+  
+  btn.style.borderColor = window.omegaEditModeActive ? "var(--primary)" : "var(--border)";
+  btn.style.color = window.omegaEditModeActive ? "var(--primary)" : "var(--muted)";
+  badge.style.display = window.omegaEditModeActive ? "inline-flex" : "none";
+  
+  if (!window.omegaEditModeActive) {
+    document.getElementById("style-inspector-panel").style.display = "none";
+  }
+  addLog(window.omegaEditModeActive ? "✏ Modo Edição Ativado — Clique em qualquer elemento para abrir o painel de propriedades." : "✏ Modo Edição Desativado.");
+}
+
+function switchTab(tab, btn) {
+  document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById(`tab-${tab}`).classList.add("active");
+  btn.classList.add("active");
+}
+
+function toggleAI() {
+  const body = document.getElementById("ai-body");
+  const ch = document.getElementById("ai-chevron");
+  const open = body.style.display === "none";
+  body.style.display = open ? "flex" : "none";
+  ch.textContent = open ? "▲" : "▼";
+}
+
+function runCustomImprovement() {
+  const txt = document.getElementById("improve-prompt").value.trim();
+  if (txt) {
+    runImprovement(txt);
+    document.getElementById("improve-prompt").value = "";
+  }
+}
+
+function saveToStorage(promptText) {
+  const projects = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  const projectIndex = projects.findIndex(p => p.id === state.currentProjectId);
+
+  const payload = {
+    id: state.currentProjectId,
+    name: state.projectName,
+    prompt: promptText,
+    files: state.currentFiles,
+    updatedAt: Date.now()
+  };
+
+  if (projectIndex >= 0) {
+    projects[projectIndex] = payload;
+  } else {
+    projects.unshift(payload);
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+  renderHistory();
+}
+
+function renderHistory() {
+  const projects = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  const container = document.getElementById("history-list");
+  if (!container) return;
+
+  if (projects.length === 0) {
+    container.innerHTML = '<p style="font-size:11px;color:var(--muted);padding:8px;text-align:center;">Nenhum software na fábrica</p>';
+    return;
+  }
+
+  container.innerHTML = projects.map(p => `
     <div class="history-item" onclick="loadProject('${p.id}')">
-      <div style="flex:1;min-width:0">
+      <div style="flex:1; min-width:0;">
         <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
-        <div style="font-size:10px;color:var(--muted)">${new Date(p.updatedAt).toLocaleDateString("pt-BR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</div>
+        <div style="font-size:10px;color:var(--muted)">${new Date(p.updatedAt).toLocaleDateString()}</div>
       </div>
-      <button class="del-btn" onclick="event.stopPropagation();delProject('${p.id}')" title="Excluir">🗑</button>
+      <button class="del-btn" onclick="event.stopPropagation(); delProject('${p.id}')">🗑</button>
     </div>
   `).join("");
 }
-function loadProject(id){
-  const p=getProjects().find(x=>x.id===id);
-  if(!p)return;
-  currentCode=p.code;currentProjectId=p.id;
-  document.getElementById("prompt").value=p.prompt||"";
-  showCode(p.code);addLog("📂 Projeto carregado: "+p.name);
-}
-function delProject(id){
-  const ps=getProjects().filter(p=>p.id!==id);
-  saveProjects(ps);
-  if(currentProjectId===id){currentProjectId=null;}
-  renderHistory();addLog("🗑 Projeto excluído.");
-}
-function newProject(){
-  currentCode="";currentProjectId=null;
-  document.getElementById("prompt").value="";
-  document.getElementById("output-frame").style.display="none";
-  document.getElementById("preview-empty").style.display="flex";
-  document.getElementById("code-output").style.display="none";
-  document.getElementById("code-empty").style.display="flex";
-  document.getElementById("copy-btn").disabled=true;
-  document.getElementById("download-btn").disabled=true;
-  addLog("✚ Novo projeto iniciado.");
+
+function loadProject(id) {
+  const projects = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  const current = projects.find(p => p.id === id);
+  if (!current) return;
+
+  state.currentProjectId = current.id;
+  state.currentFiles = current.files;
+  state.projectName = current.name;
+  
+  document.getElementById("prompt").value = current.prompt || "";
+  renderVirtualFiles();
+  addLog(`📂 Projeto restaurado no VFS: ${current.name}`);
 }
 
-// ── Init ─────────────────────────────────────────────────────────────────────
-document.addEventListener("DOMContentLoaded",()=>{
-  atualizarModelos();configurarResponsivo();renderHistory();
-  document.getElementById("generate-btn").addEventListener("click",gerarProjeto);
-  document.getElementById("stop-btn").addEventListener("click",pararGeracao);
-  document.getElementById("api-provider").addEventListener("change",atualizarModelos);
-  document.getElementById("eye-btn").addEventListener("click",()=>{const i=document.getElementById("api-key");i.type=i.type==="password"?"text":"password";});
-  document.getElementById("prompt").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))gerarProjeto();});
-  // Listen for visual editor changes from iframe
-  window.addEventListener("message",e=>{
-    if(e.data?.type==="omega_text_edit"&&e.data.html){
-      currentCode="<!DOCTYPE html>\n"+e.data.html;
-      document.getElementById("code-output").textContent=currentCode;
-      saveCurrentProject();
-    }
-  });
-});
+function delProject(id) {
+  let projects = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  projects = projects.filter(p => p.id !== id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+  if (state.currentProjectId === id) newProject();
+  renderHistory();
+}
 
-function atualizarModelos(){
-  const p=document.getElementById("api-provider").value;
-  const s=document.getElementById("model-select");
-  const m=p==="gemini"?GEMINI_MODELS:GROQ_MODELS;
-  s.innerHTML=m.map(x=>`<option value="${x}">${x}</option>`).join("");
+function newProject() {
+  state.currentFiles = {};
+  state.currentProjectId = null;
+  document.getElementById("prompt").value = "";
+  document.getElementById("output-frame").style.display = "none";
+  document.getElementById("preview-empty").style.display = "flex";
+  document.getElementById("code-output").style.display = "none";
+  document.getElementById("code-empty").style.display = "flex";
+  addLog("✚ Novo workspace limpo inicializado.");
 }
-function addLog(txt){
-  const log=document.getElementById("status-log");
-  const p=document.createElement("p");p.textContent=new Date().toLocaleTimeString()+" — "+txt;
-  log.appendChild(p);log.scrollTop=log.scrollHeight;
-}
-function isCodeCut(c){
-  const t=c.trim();
-  if(!t.toLowerCase().endsWith("</html>"))return true;
-  if(!t.toLowerCase().includes("</body>"))return true;
-  const so=(t.match(/<script/gi)||[]).length,sc=(t.match(/<\/script>/gi)||[]).length;
-  if(so>sc)return true;
-  const op=(t.match(/\{/g)||[]).length,cl=(t.match(/\}/g)||[]).length;
-  if(op-cl>5)return true;
-  return false;
-}
-function cleanCode(raw){
-  let code=raw.replace(/<think>[\s\S]*?<\/think>/gi,"").replace(/```html\s*/gi,"").replace(/```javascript\s*/gi,"").replace(/```css\s*/gi,"").replace(/```\s*/g,"").replace(/^[\s\S]*?(?=<!DOCTYPE html>|<html)/i,"").trim();
-  if(!code.toLowerCase().startsWith("<!doctype")){const idx=code.toLowerCase().indexOf("<html");if(idx>0)code=code.substring(idx);code="<!DOCTYPE html>\n"+code;}
-  if(!code.toLowerCase().includes("<html")){code=`<!DOCTYPE html>\n<html lang="pt-BR">\n<head>\n<meta charset="UTF-8">\n<style>body{font-family:Arial,sans-serif;padding:20px}</style>\n</head>\n<body>\n${code}\n</body>\n</html>`;}
-  if(isCodeCut(code)){const so=(code.match(/<script/gi)||[]).length,sc=(code.match(/<\/script>/gi)||[]).length;let fix=code;for(let i=0;i<so-sc;i++)fix+="\n}catch(e){}\n
 
-. ÚLTIMA LINHA </html>. PROIBIDO abreviar.\n\n${promptText}`;
-  const body=isGemini
-    ?{contents:[{parts:[{text:SYSTEM_PROMPT+"\n\n"+userMsg}]}],generationConfig:{temperature:0.3,maxOutputTokens:65536}}
-    :{model,messages:[{role:"system",content:SYSTEM_PROMPT},{role:"user",content:userMsg}],max_tokens:32768,temperature:0.25};
-  const headers={"Content-Type":"application/json"};
-  if(!isGemini)headers["Authorization"]="Bearer "+apiKey;
-  const data=await robustFetch(url,{method:"POST",headers,body:JSON.stringify(body),signal:abortController?.signal});
-  const raw=isGemini?data?.candidates?.[0]?.content?.parts?.[0]?.text||"":data?.choices?.[0]?.message?.content||"";
-  if(data?.choices?.[0]?.finish_reason==="length")addLog("⚠ Limite de tokens — corrigindo...");
-  const gr=data?.candidates?.[0]?.finishReason;
-  if(gr&&gr!=="STOP")addLog("⚠ Gemini parou: "+gr);
-  if(!raw||!raw.trim())throw new Error("A IA retornou resposta vazia. Verifique sua API Key.");
-  return cleanCode(raw);
-}
-function showCode(code){
-  const frame=document.getElementById("output-frame");
-  frame.srcdoc=code;frame.style.display="block";
-  document.getElementById("preview-empty").style.display="none";
-  const co=document.getElementById("code-output");co.textContent=code;co.style.display="block";
-  document.getElementById("code-empty").style.display="none";
-  document.getElementById("copy-btn").disabled=false;
-  document.getElementById("download-btn").disabled=false;
-  if(editMode)injectEditor();
-}
-async function gerarProjeto(){
-  if(isGenerating)return;
-  const prompt=document.getElementById("prompt").value.trim();
-  const apiKey=document.getElementById("api-key").value.trim();
-  if(!prompt||!apiKey){addLog("⚠ Preencha o prompt e a API Key");return;}
-  isGenerating=true;abortController=new AbortController();
-  const btn=document.getElementById("generate-btn"),stopBtn=document.getElementById("stop-btn");
-  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Gerando...';stopBtn.classList.remove("hidden");
-  addLog("⏳ Gerando projeto...");
-  try{
-    const code=await callAPI("PEDIDO DO USUÁRIO:\n"+prompt);
-    currentCode=code;currentProjectId=null;
-    showCode(code);saveCurrentProject();
-    addLog("✓ Projeto gerado e salvo!");
-  }catch(e){
-    if(e.name==="AbortError"||e.message?.includes("abort"))addLog("✕ Geração cancelada.");
-    else addLog("❌ Erro: "+e.message);
-  }finally{
-    isGenerating=false;btn.disabled=false;btn.innerHTML='<span>✨</span> Gerar Projeto';stopBtn.classList.add("hidden");
-  }
-}
-async function runImprovement(improvPrompt){
-  if(!currentCode){addLog("⚠ Gere um projeto primeiro");return;}
-  const apiKey=document.getElementById("api-key").value.trim();
-  if(!apiKey){addLog("⚠ Configure a API Key");return;}
-  isGenerating=true;abortController=new AbortController();
-  const btns=document.querySelectorAll(".quick-btn,.btn-generate");btns.forEach(b=>b.disabled=true);
-  addLog("🪄 IA Assistente aplicando melhoria...");
-  try{
-    const fullPrompt=`MODO MELHORIA — REGRAS ABSOLUTAS: mantenha TODAS as funcionalidades. APENAS adicione/melhore, NUNCA remova.\n\nMELHORIA: ${improvPrompt}\n\nCÓDIGO ATUAL:\n${currentCode}`;
-    const improved=await callAPI(fullPrompt);
-    currentCode=improved;showCode(improved);saveCurrentProject();
-    addLog("✅ Melhoria aplicada e salva!");
-  }catch(e){
-    if(e.name==="AbortError"||e.message?.includes("abort"))addLog("✕ Cancelado.");
-    else addLog("❌ Erro na melhoria: "+e.message);
-  }finally{
-    isGenerating=false;btns.forEach(b=>b.disabled=false);
-  }
-}
-function runCustomImprovement(){
-  const p=document.getElementById("improve-prompt").value.trim();
-  if(!p){addLog("⚠ Descreva a melhoria");return;}
-  runImprovement(p);document.getElementById("improve-prompt").value="";
-}
-function pararGeracao(){
-  abortController?.abort();isGenerating=false;
-  document.getElementById("generate-btn").disabled=false;
-  document.getElementById("generate-btn").innerHTML='<span>✨</span> Gerar Projeto';
-  document.getElementById("stop-btn").classList.add("hidden");
-  document.querySelectorAll(".quick-btn").forEach(b=>b.disabled=false);
-  addLog("✕ Geração cancelada.");
-}
-function switchTab(tab,btn){
-  document.querySelectorAll(".tab-content").forEach(el=>el.classList.remove("active"));
-  document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
-  document.getElementById("tab-"+tab).classList.add("active");btn.classList.add("active");
-}
-function copyCode(){
-  if(!currentCode)return;
-  navigator.clipboard.writeText(currentCode).then(()=>{
-    const btn=document.getElementById("copy-btn");btn.textContent="✅ Copiado!";
-    setTimeout(()=>btn.innerHTML="📋 Copiar",2000);
-  });
-}
-function downloadCode(){
-  if(!currentCode)return;
-  const blob=new Blob([currentCode],{type:"text/html"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");a.href=url;a.download="projeto.html";a.click();
-  URL.revokeObjectURL(url);addLog("⬇ Projeto baixado.");
-}
-function configurarResponsivo(){
-  const labels={desktop:"100%",tablet:"768px",mobile:"375px"};
-  document.querySelectorAll(".resp-btn").forEach(btn=>{
-    btn.addEventListener("click",()=>{
-      const v=btn.dataset.view;
-      document.getElementById("iframe-wrapper").className="iframe-wrapper view-"+v;
-      document.querySelectorAll(".resp-btn").forEach(b=>b.classList.remove("active"));
-      btn.classList.add("active");document.getElementById("view-label").textContent=labels[v];
+function configurarResponsivo() {
+  const labels = { desktop: "100%", tablet: "768px", mobile: "375px" };
+  document.querySelectorAll(".resp-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const view = btn.dataset.view;
+      document.getElementById("iframe-wrapper").className = `iframe-wrapper view-${view}`;
+      document.querySelectorAll(".resp-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("view-label").textContent = labels[view];
     });
-  });
-}
-function toggleAI(){
-  const body=document.getElementById("ai-body"),ch=document.getElementById("ai-chevron");
-  const open=body.style.display==="none";
-  body.style.display=open?"flex":"none";ch.textContent=open?"▲":"▼";
-}
-// ── Visual Editor ────────────────────────────────────────────────────────────
-function toggleEdit(){
-  editMode=!editMode;
-  const btn=document.getElementById("edit-btn"),badge=document.getElementById("edit-badge");
-  btn.style.borderColor=editMode?"var(--primary)":"var(--border)";
-  btn.style.color=editMode?"var(--primary)":"var(--muted)";
-  badge.style.display=editMode?"inline-flex":"none";
-  if(editMode)injectEditor();else removeEditor();
-  addLog(editMode?"✏ Editor visual ativado — clique em textos para editar":"✏ Editor visual desativado.");
-}
-function injectEditor(){
-  const iframe=document.getElementById("output-frame");
-  if(!iframe||!iframe.contentDocument)return;
-  const doc=iframe.contentDocument;
-  let style=doc.getElementById("__omega_editor_style__");
-  if(!style){style=doc.createElement("style");style.id="__omega_editor_style__";doc.head.appendChild(style);}
-  style.textContent=`[data-omega-editable]:hover{outline:2px solid #7c3aed!important;outline-offset:2px;cursor:text!important}[data-omega-editable]:focus{outline:2px solid #22c55e!important;outline-offset:2px}`;
-  const walker=doc.createTreeWalker(doc.body,NodeFilter.SHOW_ELEMENT);
-  let node=walker.nextNode();
-  while(node){
-    const tag=node.tagName?.toLowerCase();
-    const isText=["p","h1","h2","h3","h4","h5","h6","span","a","button","label","li","td","th","strong","em"].includes(tag);
-    if(isText&&!node.getAttribute("data-omega-editable")){
-      node.setAttribute("contenteditable","true");
-      node.setAttribute("data-omega-editable","true");
-      node.addEventListener("blur",e=>{
-        const newT=e.target.innerText,oldT=e.target.getAttribute("data-orig")||"";
-        if(newT!==oldT){window.parent.postMessage({type:"omega_text_edit",html:doc.documentElement.outerHTML},"*");}
-      });
-      node.addEventListener("focus",e=>{e.target.setAttribute("data-orig",e.target.innerText);});
-    }
-    node=walker.nextNode();
-  }
-}
-function removeEditor(){
-  const iframe=document.getElementById("output-frame");
-  if(!iframe||!iframe.contentDocument)return;
-  const doc=iframe.contentDocument;
-  const s=doc.getElementById("__omega_editor_style__");if(s)s.remove();
-  doc.querySelectorAll("[data-omega-editable]").forEach(el=>{
-    el.removeAttribute("contenteditable");el.removeAttribute("data-omega-editable");el.removeAttribute("data-orig");
   });
 }
