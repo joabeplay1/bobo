@@ -19,11 +19,17 @@ const state = {
   projectName: "Projeto Sem Nome"
 };
 
-// Captura global de erros para espelhar problemas diretamente no Log da UI
+// Captura global de erros síncronos
 window.onerror = function (msg, url, line) {
   addLog(`❌ Erro interno de Script: ${msg} (Linha: ${line})`);
   return false;
 };
+
+// Captura global de erros assíncronos (Promise Rejections / Async Await)
+window.addEventListener("unhandledrejection", event => {
+  const reason = event.reason?.message || event.reason || "Erro desconhecido";
+  addLog(`❌ Erro Assíncrono (Promise): ${reason}`);
+});
 
 // Exposição explícita de escopo para diretivas onclick do HTML (Módulos isolados)
 window.switchTab = switchTab;
@@ -82,6 +88,16 @@ document.addEventListener("DOMContentLoaded", () => {
     addLog("❌ Falha crítica ao inicializar os componentes da interface.");
   }
 });
+
+// 3. Auxiliar robusto para leitura segura do LocalStorage prevenindo quebras por JSON danificado
+function safeGetProjects() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  } catch (err) {
+    console.error("JSON corrompido detectado no LocalStorage. Inicializando array vazio.", err);
+    return [];
+  }
+}
 
 function atualizarModelos() {
   const providerEl = document.getElementById("api-provider");
@@ -150,6 +166,10 @@ async function gerarProjeto() {
       signal: state.abortController.signal
     });
 
+    if (!rawOutput || typeof rawOutput !== "string" || rawOutput.trim() === "") {
+      throw new Error("A inteligência artificial retornou uma resposta vazia ou inválida.");
+    }
+
     let parsedFiles = extractFiles(rawOutput) || {};
     for (const file in parsedFiles) {
       parsedFiles[file] = repairCode(parsedFiles[file]);
@@ -176,6 +196,9 @@ async function gerarProjeto() {
 }
 
 async function runImprovement(improvementPrompt) {
+  // 1. Verificação inicial para evitar concorrência e requisições simultâneas duplicadas
+  if (state.isGenerating) return;
+
   if (Object.keys(state.currentFiles || {}).length === 0) {
     addLog("⚠ Nenhum projeto carregado no VFS para evolução.");
     return;
@@ -199,6 +222,15 @@ async function runImprovement(improvementPrompt) {
 
   state.isGenerating = true;
   state.abortController = new AbortController();
+  
+  const btn = document.getElementById("generate-btn");
+  const stopBtn = document.getElementById("stop-btn");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Refatorando...';
+  }
+  if (stopBtn) stopBtn.classList.remove("hidden");
+
   addLog("🪄 IA Assistente analisando árvore de arquivos atual para refatoração...");
 
   try {
@@ -210,6 +242,10 @@ async function runImprovement(improvementPrompt) {
       currentFiles: state.currentFiles, 
       signal: state.abortController.signal
     });
+
+    if (!rawOutput || typeof rawOutput !== "string" || rawOutput.trim() === "") {
+      throw new Error("A inteligência artificial retornou um payload vazio para a melhoria solicitada.");
+    }
 
     let evolvedFiles = extractFiles(rawOutput) || {};
     for (const file in evolvedFiles) {
@@ -226,9 +262,15 @@ async function runImprovement(improvementPrompt) {
     addLog("✅ Atualização incremental aplicada sem quebras!");
 
   } catch (error) {
-    addLog(`❌ Falha no refinamento: ${error.message}`);
+    if (error.name === "AbortError") addLog("✕ Evolução incremental interrompida.");
+    else addLog(`❌ Falha no refinamento: ${error.message}`);
   } finally {
     state.isGenerating = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>✨</span> Gerar Projeto';
+    }
+    if (stopBtn) stopBtn.classList.add("hidden");
   }
 }
 
@@ -243,7 +285,15 @@ function renderVirtualFiles() {
 
   if (Object.keys(state.currentFiles || {}).length === 0) return;
 
-  const executionBlob = compileToSingleBlob(state.currentFiles);
+  // 4. Encapsulamento de segurança contra exceções críticas lançadas no compilador parser
+  let executionBlob;
+  try {
+    executionBlob = compileToSingleBlob(state.currentFiles);
+  } catch (err) {
+    console.error("Falha fatal na compilação do código para Blob:", err);
+    addLog("❌ Erro interno no compilador do Virtual File System. Operação abortada.");
+    return;
+  }
   
   if (!executionBlob) {
     addLog("❌ Erro ao processar compilação do Virtual File System.");
@@ -271,17 +321,53 @@ function renderVirtualFiles() {
   if (copyBtn) copyBtn.disabled = false;
 
   if (iframe) {
+    // Prevenção de vazamento de memória anulando handlers cíclicos prévios
+    iframe.onload = null;
     iframe.onload = () => {
-      initStyleEditor(iframe, (updatedHTML) => {
-        state.currentFiles["index.html"] = updatedHTML;
-        const currentPrompt = promptEl ? promptEl.value : "";
-        saveToStorage(currentPrompt);
-      });
+      // Encapsulamento protetivo para prevenir travamentos se o Style Editor falhar
+      try {
+        if (typeof initStyleEditor === "function") {
+          initStyleEditor(iframe, (updatedHTML) => {
+            state.currentFiles["index.html"] = updatedHTML;
+            const currentPrompt = promptEl ? promptEl.value : "";
+            saveToStorage(currentPrompt);
+          });
+        }
+      } catch (err) {
+        console.error("Falha ao injetar ou iniciar manipuladores do initStyleEditor:", err);
+        addLog("⚠ Aviso: Erro não fatal no manipulador de estilo em tempo real.");
+      }
 
       if (window.jesusReinaEditModeActive) {
         injectEditModeStyles(iframe);
       }
     };
+  }
+}
+
+// Fallback robusto via manipulação síncrona do DOM caso a Clipboard API seja bloqueada
+function fallbackCopy(text) {
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.style.position = "fixed"; 
+  area.style.top = "0";
+  area.style.left = "0";
+  area.style.opacity = "0";
+  document.body.appendChild(area);
+  area.select();
+  area.setSelectionRange(0, 99999);
+  
+  try {
+    const success = document.execCommand("copy");
+    if (success) {
+      addLog("📋 Código copiado via canal alternativo de transferência.");
+    } else {
+      throw new Error("Comando alternativo de cópia recusado pelo navegador.");
+    }
+  } catch (err) {
+    addLog(`❌ Falha total de cópia: Bloqueio de segurança do navegador.`);
+  } finally {
+    document.body.removeChild(area);
   }
 }
 
@@ -292,9 +378,17 @@ function copyCode() {
     return;
   }
 
-  navigator.clipboard.writeText(codeOutput.textContent)
-    .then(() => addLog("📋 Código completo unificado copiado para a área de transferência."))
-    .catch(err => addLog(`❌ Erro ao acessar área de transferência: ${err.message}`));
+  // Fluxo principal com Clipboard API e interceptação de rejeição estruturada
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    navigator.clipboard.writeText(codeOutput.textContent)
+      .then(() => addLog("📋 Código completo unificado copiado para a área de transferência."))
+      .catch(err => {
+        console.warn("A API nativa de clipboard falhou. Executando fallback síncrono...", err);
+        fallbackCopy(codeOutput.textContent);
+      });
+  } else {
+    fallbackCopy(codeOutput.textContent);
+  }
 }
 
 function exportarProjetoCompleto() {
@@ -311,9 +405,24 @@ function exportarProjetoCompleto() {
   }
 }
 
+// 2. Redefinição imediata da UI dos botões de geração ao disparar a interrupção manual
 function pararGeracao() {
-  if (state.abortController) state.abortController.abort();
+  if (state.abortController) {
+    state.abortController.abort();
+  }
+  
   state.isGenerating = false;
+
+  const btn = document.getElementById("generate-btn");
+  const stopBtn = document.getElementById("stop-btn");
+
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = '<span>✨</span> Gerar Projeto';
+  }
+  if (stopBtn) {
+    stopBtn.classList.add("hidden");
+  }
 }
 
 function toggleEdit() {
@@ -394,7 +503,8 @@ function runCustomImprovement() {
 
 function saveToStorage(promptText) {
   try {
-    const projects = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    // 3. Aplicação do helper seguro contra dados corrompidos
+    const projects = safeGetProjects();
     const projectIndex = projects.findIndex(p => p.id === state.currentProjectId);
 
     const payload = {
@@ -423,12 +533,8 @@ function renderHistory() {
   const container = document.getElementById("history-list");
   if (!container) return;
 
-  let projects = [];
-  try {
-    projects = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  } catch (e) {
-    projects = [];
-  }
+  // 3. Aplicação do helper seguro contra dados corrompidos
+  const projects = safeGetProjects();
 
   if (projects.length === 0) {
     container.innerHTML = '<p style="font-size:11px;color:var(--muted);padding:8px;text-align:center;">Nenhum software na fábrica</p>';
@@ -448,7 +554,8 @@ function renderHistory() {
 
 function loadProject(id) {
   try {
-    const projects = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    // 3. Aplicação do helper seguro contra dados corrompidos
+    const projects = safeGetProjects();
     const current = projects.find(p => p.id === id);
     if (!current) return;
 
@@ -468,7 +575,8 @@ function loadProject(id) {
 
 function delProject(id) {
   try {
-    let projects = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    // 3. Aplicação do helper seguro contra dados corrompidos
+    let projects = safeGetProjects();
     projects = projects.filter(p => p.id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
     if (state.currentProjectId === id) newProject();
@@ -478,6 +586,7 @@ function delProject(id) {
   }
 }
 
+// Reset estrutural completo e desativação de gatilhos inválidos ao reiniciar a área de trabalho
 function newProject() {
   state.currentFiles = {};
   state.currentProjectId = null;
@@ -496,6 +605,13 @@ function newProject() {
 
   const emptyCode = document.getElementById("code-empty");
   if (emptyCode) emptyCode.style.display = "flex";
+
+  // Desativação segura dos botões de ação para evitar chamadas sem contexto de arquivos ativos
+  const copyBtn = document.getElementById("copy-btn");
+  if (copyBtn) copyBtn.disabled = true;
+
+  const downloadBtn = document.getElementById("download-btn");
+  if (downloadBtn) downloadBtn.disabled = true;
   
   addLog("✚ Novo workspace limpo inicializado.");
 }
