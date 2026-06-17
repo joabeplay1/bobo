@@ -17,5 +17,8 @@ COMPLETUDE ABSOLUTA: 100% das funções completas. ZERO "// resto aqui", "// TOD
 
 PROIBIDO: código parcial, placeholder Lorem ipsum, botão sem ação, markdown, crases, comentários de omissão, design genérico sem personalidade.
 
-FORMATO SAGRADO: APENAS HTML. Primeira linha: <!DOCTYPE html>. CSS em <style>. JS em <script>. Última linha: </html>. NADA antes ou depois.
-`;
+FORMATO SAGRADO: Você deve responder estruturando os múltiplos arquivos usando blocos de código markdown com o caminho/nome do arquivo na primeira linha.
+Exemplo:
+```html index.html
+<!DOCTYPE html>
+...
