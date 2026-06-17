@@ -11,17 +11,30 @@
 <header>
   <div class="logo">
     <div class="logo-icon">⚡</div>
-    <div class="logo-text"><h1>Jesus Reina AI Studio</h1><p>Gerador de Software com IA</p></div>
+    <div class="logo-text">
+      <h1>Jesus Reina AI Studio</h1>
+      <p>Gerador de Software com IA</p>
+    </div>
   </div>
   <div class="status-dot"><div class="dot"></div>Online</div>
 </header>
+
 <div class="main">
   <aside class="sidebar">
     <div>
       <div class="section-label">⚙ Configuração</div>
       <div class="grid-2" style="margin-top:8px">
-        <div><label>Provedor</label><select id="api-provider"><option value="gemini">Google Gemini</option><option value="groq">Groq</option></select></div>
-        <div><label>Modelo</label><select id="model-select"></select></div>
+        <div>
+          <label>Provedor</label>
+          <select id="api-provider">
+            <option value="gemini">Google Gemini</option>
+            <option value="groq">Groq</option>
+          </select>
+        </div>
+        <div>
+          <label>Modelo</label>
+          <select id="model-select"></select>
+        </div>
       </div>
       <div style="margin-top:10px">
         <label>API Key</label>
@@ -31,10 +44,14 @@
         </div>
       </div>
     </div>
+    
     <div class="divider"></div>
+    
     <div class="ai-panel">
       <div class="ai-header" onclick="toggleAI()">
-        <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600">🪄 IA Assistente <span style="font-size:10px;color:var(--muted);font-weight:400">otimizar & evoluir</span></span>
+        <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600">
+          🪄 IA Assistente <span style="font-size:10px;color:var(--muted);font-weight:400">otimizar & evoluir</span>
+        </span>
         <span id="ai-chevron" style="color:var(--muted);font-size:11px">▼</span>
       </div>
       <div class="ai-body" id="ai-body" style="display:none">
@@ -50,7 +67,9 @@
         <button class="btn-generate" id="improve-btn" onclick="runCustomImprovement()" style="padding:8px">🪄 Aplicar Melhoria</button>
       </div>
     </div>
+    
     <div class="divider"></div>
+    
     <div>
       <div class="section-label" style="justify-content:space-between">
         <span>📁 Histórico</span>
@@ -58,7 +77,9 @@
       </div>
       <div class="history-list" id="history-list"></div>
     </div>
+    
     <div class="divider"></div>
+    
     <div style="display:flex;flex-direction:column;gap:10px;flex:1">
       <div class="section-label">✏ Prompt</div>
       <textarea id="prompt" placeholder="Descreva o que você quer criar..."></textarea>
@@ -69,6 +90,7 @@
       <p class="hint">Ctrl+Enter para gerar</p>
     </div>
   </aside>
+  
   <div class="panel">
     <div class="tabs-bar" style="justify-content:space-between">
       <div style="display:flex">
@@ -81,6 +103,7 @@
         <span id="edit-badge" class="edit-badge" style="display:none">● editando</span>
       </div>
     </div>
+    
     <div class="content">
       <div class="tab-content active" id="tab-preview">
         <div class="preview-toolbar">
@@ -94,11 +117,15 @@
         </div>
         <div class="preview-area">
           <div class="iframe-wrapper view-desktop" id="iframe-wrapper">
-            <div class="preview-empty" id="preview-empty"><div class="icon">🖥</div><p>A prévia aparecerá aqui</p></div>
+            <div class="preview-empty" id="preview-empty">
+              <div class="icon">🖥</div>
+              <p>A prévia aparecerá aqui</p>
+            </div>
             <iframe id="output-frame" style="display:none" sandbox="allow-scripts allow-forms allow-popups allow-modals" title="Preview"></iframe>
           </div>
         </div>
       </div>
+      
       <div class="tab-content" id="tab-code">
         <div class="code-toolbar">
           <span class="code-filename">Projeto Multi-Arquivos</span>
@@ -113,6 +140,7 @@
         </div>
       </div>
     </div>
+    
     <div class="log-bar">
       <div class="log-header">⬛ Log</div>
       <div id="status-log"></div>
@@ -120,18 +148,36 @@
   </div>
 </div>
 
-<div id="style-inspector-panel" style="display:none; position:fixed; right:20px; top:80px; width:260px; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; z-index:9999; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+<div id="style-inspector-panel" style="display:none; position:fixed; right:20px; top:80px; width:260px; background:var(--card, #1e1e1e); border:1px solid var(--border, #333); border-radius:12px; padding:16px; z-index:9999; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
   <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
-    <span style="font-size:11px; font-weight:bold; color:var(--primary); text-transform:uppercase;">Inspector de Estilos</span>
-    <button onclick="document.getElementById('style-inspector-panel').style.display='none'" style="background:none; border:none; color:var(--muted); cursor:pointer;">✕</button>
+    <span style="font-size:11px; font-weight:bold; color:var(--primary, #00ffff); text-transform:uppercase;">Inspector de Estilos</span>
+    <button onclick="document.getElementById('style-inspector-panel').style.display='none'" style="background:none; border:none; color:var(--muted, #888); cursor:pointer;">✕</button>
   </div>
   <div style="display:flex; flex-direction:column; gap:10px;">
-    <div><label>Cor de Fundo</label><input type="color" id="inspect-bg" style="width:100%; height:25px; border:none; border-radius:4px; cursor:pointer;"></div>
-    <div><label>Cor do Texto</label><input type="color" id="inspect-color" style="width:100%; height:25px; border:none; border-radius:4px; cursor:pointer;"></div>
-    <div><label>Tamanho da Fonte (px)</label><input type="number" id="inspect-font" min="8" max="72" value="16" class="style-input" style="width:100%;"></div>
-    <div><label>Largura</label><input type="text" id="inspect-width" placeholder="Ex: 100% ou 200px" class="style-input" style="width:100%;"></div>
-    <div><label>Altura</label><input type="text" id="inspect-height" placeholder="Ex: auto ou 50px" class="style-input" style="width:100%;"></div>
-    <div><label>Borda (CSS)</label><input type="text" id="inspect-border" placeholder="Ex: 1px solid red" class="style-input" style="width:100%;"></div>
+    <div>
+      <label style="font-size:11px; display:block; margin-bottom:4px;">Cor de Fundo</label>
+      <input type="color" id="inspect-bg" style="width:100%; height:25px; border:none; border-radius:4px; cursor:pointer;">
+    </div>
+    <div>
+      <label style="font-size:11px; display:block; margin-bottom:4px;">Cor do Texto</label>
+      <input type="color" id="inspect-color" style="width:100%; height:25px; border:none; border-radius:4px; cursor:pointer;">
+    </div>
+    <div>
+      <label style="font-size:11px; display:block; margin-bottom:4px;">Tamanho da Fonte (px)</label>
+      <input type="number" id="inspect-font" min="8" max="72" value="16" style="width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--border, #333); border-radius:4px; color:#fff; padding:4px;">
+    </div>
+    <div>
+      <label style="font-size:11px; display:block; margin-bottom:4px;">Largura</label>
+      <input type="text" id="inspect-width" placeholder="Ex: 100% ou 200px" style="width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--border, #333); border-radius:4px; color:#fff; padding:4px;">
+    </div>
+    <div>
+      <label style="font-size:11px; display:block; margin-bottom:4px;">Altura</label>
+      <input type="text" id="inspect-height" placeholder="Ex: auto ou 50px" style="width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--border, #333); border-radius:4px; color:#fff; padding:4px;">
+    </div>
+    <div>
+      <label style="font-size:11px; display:block; margin-bottom:4px;">Borda (CSS)</label>
+      <input type="text" id="inspect-border" placeholder="Ex: 1px solid red" style="width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--border, #333); border-radius:4px; color:#fff; padding:4px;">
+    </div>
   </div>
 </div>
 
