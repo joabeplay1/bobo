@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Omega Factory ⚡</title>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Omega Factory ⚡</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -32,7 +31,6 @@
       </div>
     </div>
     <div class="divider"></div>
-    <!-- AI ASSISTANT -->
     <div class="ai-panel">
       <div class="ai-header" onclick="toggleAI()">
         <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600">🪄 IA Assistente <span style="font-size:10px;color:var(--muted);font-weight:400">otimizar & evoluir</span></span>
@@ -52,7 +50,6 @@
       </div>
     </div>
     <div class="divider"></div>
-    <!-- HISTORY -->
     <div>
       <div class="section-label" style="justify-content:space-between">
         <span>📁 Histórico</span>
@@ -78,7 +75,8 @@
         <button class="tab-btn" onclick="switchTab('code',this)">💻 Código</button>
       </div>
       <div style="display:flex;align-items:center;gap:8px;padding-right:8px">
-        <button id="edit-btn" onclick="toggleEdit()" title="Editor visual — clique em textos para editar" style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:11px;padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .2s">✏ Editar Visual</button>
+        <button id="fullscreen-btn" title="Visualização em Tela Cheia" style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:11px;padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:5px;">⛶ Tela Cheia</button>
+        <button id="edit-btn" onclick="toggleEdit()" title="Editor Visual Real" style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:11px;padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:5px;">✏ Editar Visual</button>
         <span id="edit-badge" class="edit-badge" style="display:none">● editando</span>
       </div>
     </div>
@@ -102,10 +100,10 @@
       </div>
       <div class="tab-content" id="tab-code">
         <div class="code-toolbar">
-          <span class="code-filename">index.html</span>
+          <span class="code-filename">Projeto Multi-Arquivos</span>
           <div class="code-actions">
             <button class="icon-btn" id="copy-btn" onclick="copyCode()" disabled>📋 Copiar</button>
-            <button class="icon-btn" id="download-btn" onclick="downloadCode()" disabled>⬇ Baixar Projeto</button>
+            <button class="icon-btn" id="download-btn" disabled>⬇ Baixar Projeto ZIP</button>
           </div>
         </div>
         <div class="code-area">
@@ -120,23 +118,23 @@
     </div>
   </div>
 </div>
-";if(!fix.toLowerCase().includes("  <script src="script.js"></script>
-</body>"))fix+="\n</body>";if(!fix.toLowerCase().endsWith("</html>"))fix+="\n</html>";return fix;}
-  return code;
-}
-async function robustFetch(url,options){
-  const response=await fetch(url,options);
-  const data=await response.json().catch(()=>null);
-  if(!response.ok){const msg=data?.error?.message||data?.error?.code||(typeof data?.error==="string"?data.error:null)||data?.message||`HTTP ${response.status}: ${response.statusText}`;throw new Error(msg);}
-  if(data?.error)throw new Error(data.error.message||JSON.stringify(data.error));
-  return data;
-}
-async function callAPI(promptText){
-  const apiKey=document.getElementById("api-key").value.trim();
-  const provider=document.getElementById("api-provider").value;
-  const model=document.getElementById("model-select").value;
-  const isGemini=provider==="gemini";
-  const url=isGemini?`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`:"https://api.groq.com/openai/v1/chat/completions";
-  const userMsg=`INSTRUÇÕES CRÍTICAS: RESPONDA APENAS COM HTML COMPLETO. COMEÇAR COM <!DOCTYPE html>. CSS em <style>. JS em 
+
+<div id="style-inspector-panel" style="display:none; position:fixed; right:20px; top:80px; width:260px; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; z-index:9999; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+  <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+    <span style="font-size:11px; font-weight:bold; color:var(--primary); text-transform:uppercase;">Inspector de Estilos</span>
+    <button onclick="document.getElementById('style-inspector-panel').style.display='none'" style="background:none; border:none; color:var(--muted); cursor:pointer;">✕</button>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:10px;">
+    <div><label>Cor de Fundo</label><input type="color" id="inspect-bg" style="width:100%; height:25px; border:none; border-radius:4px; cursor:pointer;"></div>
+    <div><label>Cor do Texto</label><input type="color" id="inspect-color" style="width:100%; height:25px; border:none; border-radius:4px; cursor:pointer;"></div>
+    <div><label>Tamanho da Fonte (px)</label><input type="number" id="inspect-font" min="8" max="72" value="16" class="style-input" style="width:100%;"></div>
+    <div><label>Largura</label><input type="text" id="inspect-width" placeholder="Ex: 100% ou 200px" class="style-input" style="width:100%;"></div>
+    <div><label>Altura</label><input type="text" id="inspect-height" placeholder="Ex: auto ou 50px" class="style-input" style="width:100%;"></div>
+    <div><label>Borda (CSS)</label><input type="text" id="inspect-border" placeholder="Ex: 1px solid red" class="style-input" style="width:100%;"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script type="module" src="script.js"></script>
 </body>
 </html>
